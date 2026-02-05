@@ -1,0 +1,186 @@
+"""
+Lyrics Extractor with Caching.
+Fetched lyrics are stored in a central cache folder to avoid re-fetching.
+"""
+import os
+import hashlib
+import mutagen
+from mutagen.id3 import ID3, USLT
+from mutagen.flac import FLAC
+from mutagen.mp4 import MP4
+from logger import get_logger
+import lyrics_scraper
+import config
+
+log = get_logger("LyricsExtractor")
+
+
+def _get_cache_path(filepath, title, artist):
+    """Generate a unique cache file path for a song."""
+    # Create a unique hash based on filepath (handles duplicates)
+    unique_key = f"{filepath}|{title}|{artist}"
+    hash_name = hashlib.md5(unique_key.encode('utf-8')).hexdigest()[:16]
+    
+    # Clean filename for cache
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in (title or "unknown")[:50])
+    safe_artist = "".join(c if c.isalnum() or c in " -_" else "_" for c in (artist or "unknown")[:30])
+    
+    cache_filename = f"{safe_artist} - {safe_title} [{hash_name}].txt"
+    return os.path.join(config.LYRICS_CACHE_DIR, cache_filename)
+
+
+def _ensure_cache_dir():
+    """Create lyrics cache directory if it doesn't exist."""
+    if not os.path.exists(config.LYRICS_CACHE_DIR):
+        os.makedirs(config.LYRICS_CACHE_DIR)
+        log.info(f"Created lyrics cache directory: {config.LYRICS_CACHE_DIR}")
+
+
+def _get_cached_lyrics(cache_path):
+    """Try to load lyrics from cache."""
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    return content
+        except Exception as e:
+            log.warning(f"Failed to read cache {cache_path}: {e}")
+    return None
+
+
+def _save_to_cache(cache_path, lyrics):
+    """Save lyrics to cache file."""
+    try:
+        _ensure_cache_dir()
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            f.write(lyrics)
+    except Exception as e:
+        log.warning(f"Failed to save cache {cache_path}: {e}")
+
+
+def get_lyrics(filepath, title=None, artist=None, allow_online=False):
+    """
+    Attempts to retrieve lyrics for a given audio file.
+    Priority:
+    1. Local Sidecar File (.lrc, .txt next to audio file)
+    2. Lyrics Cache (previously fetched online lyrics)
+    3. Embedded Tags (ID3 USLT, FLAC LYRICS)
+    4. Online Fetch (Genius/OVH) - ONLY if allow_online=True
+    
+    Returns:
+        str: Lyrics text or None if not found.
+    """
+    cache_path = _get_cache_path(filepath, title, artist)
+    
+    # 1. Check for Sidecar Files (user-provided local files)
+    base_path = os.path.splitext(filepath)[0]
+    for ext in ['.lrc', '.txt']:
+        sidecar = base_path + ext
+        if os.path.exists(sidecar):
+            try:
+                with open(sidecar, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    if ext == '.lrc':
+                        return _clean_lrc(content)
+                    return content
+            except Exception as e:
+                log.error(f"Error reading sidecar lyrics {sidecar}: {e}")
+
+    # 2. Check Lyrics Cache (previously fetched from online)
+    cached = _get_cached_lyrics(cache_path)
+    if cached:
+        return cached
+
+    # 3. Check Embedded Tags
+    try:
+        file_ext = os.path.splitext(filepath)[1].lower()
+        content = None
+        if file_ext == '.mp3':
+            content = _get_mp3_lyrics(filepath)
+        elif file_ext == '.flac':
+            content = _get_flac_lyrics(filepath)
+        elif file_ext == '.m4a':
+            content = _get_m4a_lyrics(filepath)
+            
+        if content:
+            # Cache embedded lyrics too for consistency
+            _save_to_cache(cache_path, content)
+            return content
+    except Exception as e:
+        log.warning(f"Error reading embedded lyrics for {filepath}: {e}")
+
+    # 4. Online Fetch (Optional) - only if not cached
+    if allow_online and title and artist:
+        log.info(f"Local lyrics not found for '{title}', attempting online fetch...")
+        online_lyrics = lyrics_scraper.fetch_lyrics(title, artist)
+        if online_lyrics:
+            # Save to cache for future scans
+            _save_to_cache(cache_path, online_lyrics)
+            return online_lyrics
+
+    return None
+
+
+def _clean_lrc(content):
+    """Removes timestamps like [00:12.34] from LRC content."""
+    import re
+    lines = [line for line in content.splitlines() 
+             if not line.strip().startswith('[ar:') 
+             and not line.strip().startswith('[ti:')]
+    
+    clean_lines = []
+    for line in lines:
+        text = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', line).strip()
+        if text:
+            clean_lines.append(text)
+    return "\n".join(clean_lines)
+
+
+def _get_mp3_lyrics(filepath):
+    try:
+        audio = ID3(filepath)
+        uslt_keys = [key for key in audio.keys() if key.startswith("USLT")]
+        if uslt_keys:
+            return audio[uslt_keys[0]].text
+    except mutagen.id3.ID3NoHeaderError:
+        pass
+    except Exception:
+        pass
+    return None
+
+
+def _get_flac_lyrics(filepath):
+    try:
+        audio = FLAC(filepath)
+        if 'LYRICS' in audio:
+            return audio['LYRICS'][0]
+        if 'UNSYNCEDLYRICS' in audio:
+            return audio['UNSYNCEDLYRICS'][0]
+    except Exception:
+        pass
+    return None
+
+
+def _get_m4a_lyrics(filepath):
+    try:
+        audio = MP4(filepath)
+        if '©lyr' in audio:
+            return audio['©lyr'][0]
+    except Exception:
+        pass
+    return None
+
+
+def get_cache_stats():
+    """Returns stats about the lyrics cache."""
+    if not os.path.exists(config.LYRICS_CACHE_DIR):
+        return {'count': 0, 'size_mb': 0}
+    
+    files = [f for f in os.listdir(config.LYRICS_CACHE_DIR) if f.endswith('.txt')]
+    total_size = sum(os.path.getsize(os.path.join(config.LYRICS_CACHE_DIR, f)) for f in files)
+    
+    return {
+        'count': len(files),
+        'size_mb': round(total_size / (1024 * 1024), 2)
+    }

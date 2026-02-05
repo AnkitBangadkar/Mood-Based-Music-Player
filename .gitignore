@@ -1,0 +1,46 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database and embeddings (generated files)
+library.db
+embeddings.npy
+embeddings_v2.npz
+embeddings_v3.npy
+ids.json
+ids_v2.json
+ids_v3.json
+
+# Lyrics cache (can be regenerated)
+lyrics_cache/
+
+# Logs
+*.log
+app.log
+server.log
+server.err
+
+# Test logs
+testlogs*.txt
+
+# Editor files
+*.kate-swp
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test music files (large binary files)
+songs_testing/
