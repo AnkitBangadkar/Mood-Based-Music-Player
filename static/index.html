@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Playlist Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <h1>🎵 Mood Playlist Generator</h1>
+        <div class="scan-controls">
+            <button class="secondary" id="scan-btn">Scan Library</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Generator Panel -->
+        <section class="generator-panel">
+            <input type="text" id="prompt-input" placeholder="Describe a mood (e.g., 'Sad songs for a rainy day')..." autocomplete="off">
+            <button id="generate-btn">Generate Playlist</button>
+        </section>
+
+        <!-- Results / Queue -->
+        <section id="results-area">
+            <div class="song-headers song-item">
+                <span class="index">#</span>
+                <span class="title">Title</span>
+                <span class="artist">Artist</span>
+                <span class="bpm">BPM</span>
+                <span class="score">Match</span>
+                <span class="duration">Dur</span>
+            </div>
+            <div id="song-list" class="song-list">
+                <!-- Songs will be injected here -->
+                <div style="text-align:center; padding: 2rem; color: #666;">
+                    Generate a playlist to see songs here.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Player Bar -->
+    <footer class="player-bar">
+        <!-- Song Info -->
+        <div class="now-playing">
+            <div class="now-playing-title" id="np-title">No Song Selected</div>
+            <div class="now-playing-artist" id="np-artist">-</div>
+        </div>
+
+        <!-- Controls -->
+        <div class="player-controls">
+            <div class="control-buttons">
+                <button class="control-btn" id="shuffle-btn" title="Shuffle">🔀</button>
+                <button class="control-btn" id="prev-btn" title="Previous">⏮</button>
+                <button class="play-pause-btn" id="play-pause-btn" title="Play/Pause">▶</button>
+                <button class="control-btn" id="next-btn" title="Next">⏭</button>
+                <button class="control-btn" id="repeat-btn" title="Repeat">🔁</button>
+            </div>
+            
+            <!-- Progress -->
+            <div class="progress-container">
+                <span id="current-time">0:00</span>
+                <input type="range" id="progress-bar" min="0" max="100" value="0">
+                <span id="duration">0:00</span>
+            </div>
+        </div>
+
+        <!-- Volume -->
+        <div class="volume-controls">
+            <span>🔊</span>
+            <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="0.8">
+        </div>
+    </footer>
+
+    <!-- Scan Modal -->
+    <div id="scan-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Scan Library</h2>
+            <p style="margin-bottom:1rem; font-size:0.9rem; color:#aaa;">Enter the absolute path to your music folder.</p>
+            <input type="text" id="scan-path-input" placeholder="/home/user/Music">
+            <div style="display:flex; gap:1rem; justify-content:center;">
+                <button class="secondary" id="cancel-scan-btn">Cancel</button>
+                <button id="confirm-scan-btn">Start Scan</button>
+            </div>
+            <div id="scan-status" style="margin-top:1rem; font-size:0.9rem;"></div>
+        </div>
+    </div>
+
+    <!-- Audio Element (Hidden) -->
+    <audio id="audio-player"></audio>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
