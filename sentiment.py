@@ -1,79 +1,116 @@
-import config
+"""
+Lyrics Emotion Analyzer - Uses emotion classification model.
+Maps 7 emotions to valence for improved mood matching.
+"""
+
 import threading
 from logger import get_logger
-# We delay imports of torch/transformers to keep startup fast if not needed
 
 log = get_logger("Sentiment")
 
-class SentimentAnalyzer:
+MODEL_NAME = "j-hartmann/emotion-english-distilroberta-base"
+
+EMOTION_TO_VALENCE = {
+    "joy": 0.8,
+    "surprise": 0.3,
+    "neutral": 0.0,
+    "anger": -0.4,
+    "disgust": -0.5,
+    "fear": -0.3,
+    "sadness": -0.7,
+}
+
+EMOTION_MOOD_KEYWORDS = {
+    "joy": ["happy", "joyful", "cheerful", "delighted", "ecstatic"],
+    "surprise": ["unexpected", "surprising", "shocking"],
+    "neutral": ["calm", "steady", "balanced"],
+    "anger": ["angry", "furious", "rage", "mad", "intense"],
+    "disgust": ["gross", "sick", "repulsed"],
+    "fear": ["scared", "fearful", "terrified", "anxious", "dark"],
+    "sadness": ["sad", "melancholy", "somber", "grief", "heartbroken", "depressed"],
+}
+
+
+class EmotionAnalyzer:
     def __init__(self):
         self.pipeline = None
-        self.model_name = config.MODEL_SENTIMENT
-        self.use_deep = config.ENABLE_DEEP_SENTIMENT
         self._lock = threading.Lock()
         self._loaded = False
 
     def load_model(self):
-        # Thread-safe model loading (scanner uses multiple threads)
         if self._loaded:
             return
-            
+
         with self._lock:
-            # Double-check after acquiring lock
             if self._loaded:
                 return
-                
-            if self.use_deep and self.pipeline is None:
+
+            try:
+                from transformers import pipeline
+
+                log.info(f"Loading Emotion Model: {MODEL_NAME}...")
                 try:
-                    from transformers import pipeline
-                    log.info(f"Loading Sentiment Model: {self.model_name}...")
-                    
-                    # Let pipeline handle device placement automatically
-                    # This avoids the "meta tensor" error with newer transformers
                     self.pipeline = pipeline(
-                        "sentiment-analysis", 
-                        model=self.model_name,
-                        device=-1  # -1 = CPU explicitly
+                        "text-classification", model=MODEL_NAME, top_k=None, device=-1
                     )
-                    self._loaded = True
                 except Exception as e:
-                    log.error(f"Failed to load transformer: {e}. Falling back to neutral.")
-                    self.use_deep = False
-                    self._loaded = True  # Mark as "loaded" to prevent retries
+                    log.warning(f"Online load failed: {e}. Trying offline cache...")
+                    self.pipeline = pipeline(
+                        "text-classification",
+                        model=MODEL_NAME,
+                        top_k=None,
+                        device=-1,
+                        local_files_only=True,
+                    )
+                self._loaded = True
+                log.info("Emotion model loaded successfully.")
+            except Exception as e:
+                log.error(f"Failed to load emotion model: {e}")
+                self._loaded = True
 
     def analyze(self, text):
         """
-        Returns a float score from -1.0 (Negative) to 1.0 (Positive).
+        Analyze lyrics text and return emotion info.
+
+        Returns:
+            dict: {
+                'emotion': str,      # e.g., 'joy', 'sadness', 'anger'
+                'score': float,      # confidence 0-1
+                'valence': float,   # -1 to +1 derived from emotion
+                'mood_words': list   # keywords to add to mood text
+            }
         """
-        if not text or len(text.strip()) < 5:
-            return 0.0
+        if not text or len(text.strip()) < 10:
+            return {"emotion": None, "score": 0.0, "valence": 0.0, "mood_words": []}
 
-        if self.use_deep:
-            self.load_model()
-            if self.pipeline:
-                # Truncate text to 512 chars to fit model context and speed it up
-                # We analyze the "heart" of the lyrics (usually first chunk)
-                truncated_text = text[:512]
-                try:
-                    result = self.pipeline(truncated_text)[0]
-                    # Result ex: {'label': 'POSITIVE', 'score': 0.99}
-                    label = result['label']
-                    score = result['score']
-                    
-                    if label == 'NEGATIVE':
-                        return -score
-                    return score
-                except Exception as e:
-                    log.warning(f"Sentiment analysis failed: {e}")
-                    return 0.0
-        
-        # Fallback / Low Tier (Placeholder for VADER)
-        # For now, just return 0.0 so we don't break
-        return 0.0
+        self.load_model()
+        if not self.pipeline:
+            return {"emotion": None, "score": 0.0, "valence": 0.0, "mood_words": []}
 
-# Singleton
-_analyzer = SentimentAnalyzer()
+        try:
+            truncated = text[:512]
+            result = self.pipeline(truncated)[0]
 
-def analyze_text(text):
+            if result and len(result) > 0:
+                top_emotion = result[0]["label"]
+                top_score = result[0]["score"]
+                valence = EMOTION_TO_VALENCE.get(top_emotion, 0.0)
+                mood_words = EMOTION_MOOD_KEYWORDS.get(top_emotion, [])[:2]
+
+                return {
+                    "emotion": top_emotion,
+                    "score": float(top_score),
+                    "valence": valence,
+                    "mood_words": mood_words,
+                }
+        except Exception as e:
+            log.warning(f"Emotion analysis failed: {e}")
+
+        return {"emotion": None, "score": 0.0, "valence": 0.0, "mood_words": []}
+
+
+_analyzer = EmotionAnalyzer()
+
+
+def analyze_lyrics(text):
     return _analyzer.analyze(text)
-

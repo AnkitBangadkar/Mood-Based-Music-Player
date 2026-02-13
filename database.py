@@ -9,18 +9,21 @@ DB_PATH = "library.db"
 # Thread-local storage for connection pooling
 _local = threading.local()
 
+
 def get_connection():
     """Get a thread-local database connection (connection pooling)."""
-    if not hasattr(_local, 'conn') or _local.conn is None:
+    if not hasattr(_local, "conn") or _local.conn is None:
         _local.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         _local.conn.row_factory = sqlite3.Row
     return _local.conn
 
+
 def close_connection():
     """Close the thread-local connection if it exists."""
-    if hasattr(_local, 'conn') and _local.conn is not None:
+    if hasattr(_local, "conn") and _local.conn is not None:
         _local.conn.close()
         _local.conn = None
+
 
 def init_db():
     conn = get_connection()
@@ -54,6 +57,8 @@ def init_db():
         "ALTER TABLE songs ADD COLUMN valence REAL",
         "ALTER TABLE songs ADD COLUMN arousal REAL",
         "ALTER TABLE songs ADD COLUMN mode TEXT",
+        "ALTER TABLE songs ADD COLUMN lyrics_emotion TEXT",
+        "ALTER TABLE songs ADD COLUMN lyrics_emotion_score REAL",
     ]
     for migration in migrations:
         try:
@@ -62,31 +67,71 @@ def init_db():
             pass  # Column already exists
     conn.commit()
 
-def add_song(filepath, title, artist, album, genre, rich_description, 
-             bpm=0.0, energy=0.0, brightness=0.0, valence=0.0, arousal=0.0, mode='',
-             sentiment=0.0, has_lyrics=False,
-             lyrics_vec=None, audio_vec=None, meta_vec=None, file_mtime=None):
+
+def add_song(
+    filepath,
+    title,
+    artist,
+    album,
+    genre,
+    rich_description,
+    bpm=0.0,
+    energy=0.0,
+    brightness=0.0,
+    valence=0.0,
+    arousal=0.0,
+    mode="",
+    sentiment=0.0,
+    has_lyrics=False,
+    lyrics_vec=None,
+    audio_vec=None,
+    meta_vec=None,
+    file_mtime=None,
+    lyrics_emotion=None,
+    lyrics_emotion_score=0.0,
+):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO songs (
                 filepath, file_mtime, title, artist, album, genre, rich_description, 
                 bpm, energy, brightness, valence, arousal, mode, sentiment, has_lyrics,
-                lyrics_vec, audio_vec, meta_vec
+                lyrics_vec, audio_vec, meta_vec, lyrics_emotion, lyrics_emotion_score
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            filepath, file_mtime, title, artist, album, genre, rich_description, 
-            bpm, energy, brightness, valence, arousal, mode, sentiment, 1 if has_lyrics else 0,
-            lyrics_vec, audio_vec, meta_vec
-        ))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                filepath,
+                file_mtime,
+                title,
+                artist,
+                album,
+                genre,
+                rich_description,
+                bpm,
+                energy,
+                brightness,
+                valence,
+                arousal,
+                mode,
+                sentiment,
+                1 if has_lyrics else 0,
+                lyrics_vec,
+                audio_vec,
+                meta_vec,
+                lyrics_emotion,
+                lyrics_emotion_score,
+            ),
+        )
         song_id = cursor.lastrowid
         conn.commit()
         return song_id
     except sqlite3.Error as e:
         log.error(f"Error adding song {filepath}: {e}")
         return None
+
 
 def get_all_songs():
     conn = get_connection()
@@ -95,6 +140,7 @@ def get_all_songs():
     songs = cursor.fetchall()
     return songs
 
+
 def get_song_by_id(song_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -102,17 +148,19 @@ def get_song_by_id(song_id):
     song = cursor.fetchone()
     return song
 
+
 def get_songs_by_ids(song_ids):
     """Batch fetch multiple songs by their IDs (avoids N+1 queries)."""
     if not song_ids:
         return {}
-    
+
     conn = get_connection()
     cursor = conn.cursor()
-    placeholders = ','.join('?' * len(song_ids))
+    placeholders = ",".join("?" * len(song_ids))
     cursor.execute(f"SELECT * FROM songs WHERE id IN ({placeholders})", song_ids)
     songs = cursor.fetchall()
-    return {song['id']: song for song in songs}
+    return {song["id"]: song for song in songs}
+
 
 def get_existing_songs():
     """
@@ -122,7 +170,10 @@ def get_existing_songs():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, filepath, file_mtime FROM songs")
-    return {row['filepath']: (row['id'], row['file_mtime']) for row in cursor.fetchall()}
+    return {
+        row["filepath"]: (row["id"], row["file_mtime"]) for row in cursor.fetchall()
+    }
+
 
 def get_song_by_filepath(filepath):
     """Get a single song by its filepath."""
@@ -131,16 +182,18 @@ def get_song_by_filepath(filepath):
     cursor.execute("SELECT * FROM songs WHERE filepath = ?", (filepath,))
     return cursor.fetchone()
 
+
 def delete_songs_by_ids(song_ids):
     """Delete songs by their IDs (for removing files that no longer exist)."""
     if not song_ids:
         return
     conn = get_connection()
     cursor = conn.cursor()
-    placeholders = ','.join('?' * len(song_ids))
+    placeholders = ",".join("?" * len(song_ids))
     cursor.execute(f"DELETE FROM songs WHERE id IN ({placeholders})", song_ids)
     conn.commit()
     log.info(f"Deleted {len(song_ids)} songs that no longer exist on disk.")
+
 
 def clear_library():
     conn = get_connection()
@@ -148,9 +201,10 @@ def clear_library():
     cursor.execute("DELETE FROM songs")
     conn.commit()
 
+
 def get_song_count():
     """Returns the number of indexed songs."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) as count FROM songs")
-    return cursor.fetchone()['count']
+    return cursor.fetchone()["count"]
