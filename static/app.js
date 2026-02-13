@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
         npArtist.innerText = song.artist;
         
         // Update Active Class in List
-        document.querySelectorAll(".song-item").forEach((el, i) => {
+        document.querySelectorAll("#song-list .song-item").forEach((el, i) => {
             el.classList.toggle("active", i === currentIndex);
         });
 
