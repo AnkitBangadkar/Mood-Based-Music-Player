@@ -21,7 +21,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logger import get_logger
 import config
-import clap_embedder
 
 log = get_logger("Scanner")
 
@@ -576,20 +575,6 @@ def scan_library(
         )
     _rebuild_index_from_db()
 
-    # CLAP embedding pass: compute audio embeddings for all songs
-    final_count = existing_song_count + count
-    if progress_callback:
-        progress_callback(
-            {
-                "current": 0,
-                "total": 1,
-                "current_file": "Computing CLAP embeddings...",
-                "stage": "clap",
-                "indexed_songs": final_count,
-            }
-        )
-    _compute_clap_embeddings(force_rescan=force_rescan)
-
     elapsed_time = time.time() - start_time
     total_songs = database.get_song_count()
     log.info(
@@ -670,110 +655,3 @@ def _process_batch(batch, all_ids, all_embeddings, eng):
         if song_id:
             all_ids.append(song_id)
             all_embeddings.append(embeddings[i])
-
-
-def _compute_clap_embeddings(force_rescan=False):
-    """
-    Compute CLAP audio embeddings for all songs in the database.
-    Stores as clap_embeddings.npy + clap_ids.json.
-
-    Incremental: only processes songs that don't have CLAP embeddings yet,
-    unless force_rescan is True.
-    """
-    clap = clap_embedder.get_clap()
-    songs = database.get_all_songs()
-
-    if not songs:
-        log.info("No songs in database, skipping CLAP embeddings.")
-        return
-
-    # Load existing CLAP embeddings for incremental update
-    existing_clap_ids = set()
-    existing_embeddings = {}
-
-    if (
-        not force_rescan
-        and os.path.exists(clap_embedder.CLAP_EMBEDDINGS_PATH)
-        and os.path.exists(clap_embedder.CLAP_IDS_PATH)
-    ):
-        try:
-            old_embs = np.load(clap_embedder.CLAP_EMBEDDINGS_PATH)
-            with open(clap_embedder.CLAP_IDS_PATH, "r") as f:
-                old_ids = json.load(f)
-            for i, sid in enumerate(old_ids):
-                existing_clap_ids.add(sid)
-                existing_embeddings[sid] = old_embs[i]
-            log.info(f"Loaded {len(old_ids)} existing CLAP embeddings.")
-        except Exception as e:
-            log.warning(f"Failed to load existing CLAP embeddings: {e}")
-            existing_clap_ids = set()
-            existing_embeddings = {}
-
-    # Determine which songs need CLAP processing
-    songs_to_process = []
-    for song in songs:
-        if song["id"] not in existing_clap_ids:
-            songs_to_process.append(song)
-
-    if not songs_to_process and not force_rescan:
-        log.info("All songs already have CLAP embeddings. Skipping.")
-        return
-
-    if force_rescan:
-        songs_to_process = songs
-        existing_embeddings = {}
-
-    log.info(
-        f"Computing CLAP embeddings for {len(songs_to_process)} songs "
-        f"({len(songs) - len(songs_to_process)} already cached)..."
-    )
-
-    # Process songs one at a time (GPU memory + reliability)
-    new_embeddings = {}
-    failed = 0
-
-    for i, song in enumerate(songs_to_process):
-        filepath = song["filepath"]
-        song_id = song["id"]
-
-        if not os.path.exists(filepath):
-            log.warning(f"CLAP: File not found, skipping: {filepath}")
-            failed += 1
-            continue
-
-        emb = clap.embed_audio(filepath)
-
-        if emb is not None:
-            new_embeddings[song_id] = emb
-        else:
-            failed += 1
-
-        if (i + 1) % 10 == 0 or (i + 1) == len(songs_to_process):
-            log.info(
-                f"CLAP progress: {i + 1}/{len(songs_to_process)} ({failed} failed)"
-            )
-
-    # Merge existing + new
-    all_clap = {**existing_embeddings, **new_embeddings}
-
-    # Build ordered arrays matching database song order
-    final_ids = []
-    final_embeddings = []
-
-    for song in songs:
-        sid = song["id"]
-        if sid in all_clap:
-            final_ids.append(sid)
-            final_embeddings.append(all_clap[sid])
-
-    if final_embeddings:
-        emb_matrix = np.stack(final_embeddings)
-        np.save(clap_embedder.CLAP_EMBEDDINGS_PATH, emb_matrix)
-        with open(clap_embedder.CLAP_IDS_PATH, "w") as f:
-            json.dump(final_ids, f)
-        log.info(
-            f"Saved {len(final_ids)} CLAP embeddings "
-            f"({len(new_embeddings)} new, {failed} failed)."
-        )
-    else:
-        log.warning("No CLAP embeddings computed!")

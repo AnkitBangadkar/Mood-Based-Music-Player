@@ -20,7 +20,6 @@ from sentence_transformers import SentenceTransformer, util
 from logger import get_logger
 import config
 import database
-import clap_embedder
 
 log = get_logger("Engine")
 
@@ -385,13 +384,12 @@ QUERY_EMOTION_TARGETS = {
 # ──────────────────────────────────────────────────────────────────────
 # Ensemble weights
 # ──────────────────────────────────────────────────────────────────────
-W_CLAP = (
-    0.00  # CLAP disabled — laion/clap-htsat-unfused lacks music-mood discrimination
-)
-W_SEMANTIC = 0.35  # Sentence-transformer cosine similarity (mood text keywords)
-W_FEATURES = 0.53  # Audio feature match weight (hand-crafted profiles)
+W_SEMANTIC = 0.40  # Sentence-transformer cosine similarity (mood text keywords)
+W_FEATURES = 0.48  # Audio feature match weight (hand-crafted profiles)
 W_GENRE = 0.12  # Genre match weight
-W_EMOTION = 0.00  # Emotion distribution match weight (no songs have lyrics/emotion data yet; revert to 0.13 when lyrics are added)
+W_EMOTION = (
+    0.00  # Emotion distribution match weight (no songs have lyrics/emotion data yet)
+)
 
 
 class VectorEngine:
@@ -400,10 +398,6 @@ class VectorEngine:
         self.model = None
         self.embeddings = None  # Single vector per song
         self.ids = []
-        # CLAP state
-        self.clap_embeddings = None  # [N, 512] CLAP audio embeddings
-        self.clap_ids = []  # Song IDs matching clap_embeddings rows
-        self.clap_id_to_idx = {}  # song_id -> index in clap_embeddings
 
     def load_model(self):
         if self.model is None:
@@ -442,46 +436,17 @@ class VectorEngine:
             self.ids = json.load(f)
 
         log.info(f"Loaded index with {len(self.ids)} items.")
-
-        # Load CLAP embeddings if available
-        self._load_clap_index()
-
         return True
-
-    def _load_clap_index(self):
-        """Load CLAP audio embeddings from disk."""
-        clap_emb_path = clap_embedder.CLAP_EMBEDDINGS_PATH
-        clap_ids_path = clap_embedder.CLAP_IDS_PATH
-
-        if not os.path.exists(clap_emb_path) or not os.path.exists(clap_ids_path):
-            log.info("CLAP index not found, CLAP signal will be disabled.")
-            self.clap_embeddings = None
-            self.clap_ids = []
-            self.clap_id_to_idx = {}
-            return
-
-        try:
-            self.clap_embeddings = np.load(clap_emb_path)
-            with open(clap_ids_path, "r") as f:
-                self.clap_ids = json.load(f)
-            self.clap_id_to_idx = {sid: i for i, sid in enumerate(self.clap_ids)}
-            log.info(f"Loaded CLAP index with {len(self.clap_ids)} items.")
-        except Exception as e:
-            log.warning(f"Failed to load CLAP index: {e}")
-            self.clap_embeddings = None
-            self.clap_ids = []
-            self.clap_id_to_idx = {}
 
     def search(self, query, limit=20):
         """
         Search for songs matching the query using multi-signal ensemble scoring.
 
         Signals:
-          1. CLAP similarity (audio-text contrastive embedding cosine sim)
-          2. Semantic similarity (sentence-transformer cosine sim of mood text)
-          3. Audio feature matching (how well song features match query intent)
-          4. Genre matching (if query mentions a genre)
-          5. Emotion distribution matching (soft match against lyrics emotion scores)
+          1. Semantic similarity (sentence-transformer cosine sim of mood text)
+          2. Audio feature matching (how well song features match query intent)
+          3. Genre matching (if query mentions a genre)
+          4. Emotion distribution matching (soft match against lyrics emotion scores)
 
         Also supports:
           - Negative query parsing ("happy but not slow", "not aggressive")
@@ -501,47 +466,6 @@ class VectorEngine:
         max_similarity = np.max(raw_similarities)
         log.info(f"Top raw similarity: {max_similarity:.4f}")
 
-        # 1b. CLAP similarity (audio-text in shared 512-dim space)
-        has_clap = (
-            W_CLAP > 0 and self.clap_embeddings is not None and len(self.clap_ids) > 0
-        )
-        clap_scores = np.zeros(len(self.ids))
-
-        if has_clap:
-            clap = clap_embedder.get_clap()
-            clap_query_vec = clap.embed_text(clean_query)  # [512]
-
-            # Compute cosine sim against all CLAP audio embeddings
-            # Both are L2-normalized, so dot product = cosine sim
-            raw_clap_sims = self.clap_embeddings @ clap_query_vec  # [N_clap]
-
-            # Map CLAP scores to the main song ID order
-            for i, song_id in enumerate(self.ids):
-                if song_id in self.clap_id_to_idx:
-                    clap_idx = self.clap_id_to_idx[song_id]
-                    clap_scores[i] = raw_clap_sims[clap_idx]
-
-            # Center CLAP scores around zero: subtract mean
-            # This makes CLAP a zero-sum signal — it boosts songs that
-            # score above average and penalizes those below. Prevents
-            # the tight clustering (~0.3-0.5 for all songs) from adding
-            # a near-constant offset that just shifts all scores up.
-            active_mask = clap_scores != 0
-            if np.any(active_mask):
-                clap_mean = float(np.mean(clap_scores[active_mask]))
-                clap_scores[active_mask] -= clap_mean
-                # Scale to [-1, 1] range for fair weighting
-                clap_abs_max = max(abs(np.min(clap_scores)), abs(np.max(clap_scores)))
-                if clap_abs_max > 0:
-                    clap_scores /= clap_abs_max
-
-            clap_max = float(np.max(clap_scores))
-            clap_min = (
-                float(np.min(clap_scores[active_mask])) if np.any(active_mask) else 0.0
-            )
-
-            log.info(f"CLAP centered: range=[{clap_min:.4f}, {clap_max:.4f}]")
-
         # 2. Expand query and detect signals
         expanded_keywords = self._expand_query(clean_query)
         genre_targets = self._detect_genre(clean_query)
@@ -554,23 +478,21 @@ class VectorEngine:
         has_negation = len(negated_keywords) > 0
 
         # Adjust weights based on available signals
-        w_clap = W_CLAP if has_clap else 0.0
         w_sem = W_SEMANTIC
         w_feat = W_FEATURES if has_feature_signal else 0.0
         w_genre = W_GENRE if has_genre_signal else 0.0
         w_emotion = W_EMOTION if has_emotion_signal else 0.0
 
         # Redistribute unused weight proportionally
-        total_active = w_clap + w_sem + w_feat + w_genre + w_emotion
+        total_active = w_sem + w_feat + w_genre + w_emotion
         if total_active > 0:
-            w_clap /= total_active
             w_sem /= total_active
             w_feat /= total_active
             w_genre /= total_active
             w_emotion /= total_active
 
         log.info(
-            f"Weights: CLAP={w_clap:.2f}, Semantic={w_sem:.2f}, "
+            f"Weights: Semantic={w_sem:.2f}, "
             f"Features={w_feat:.2f}, Genre={w_genre:.2f}, Emotion={w_emotion:.2f}"
         )
 
@@ -626,8 +548,7 @@ class VectorEngine:
 
         # 4. Blend signals
         final_scores = (
-            w_clap * clap_scores
-            + w_sem * norm_semantic
+            w_sem * norm_semantic
             + w_feat * feature_scores
             + w_genre * genre_scores
             + w_emotion * emotion_scores
