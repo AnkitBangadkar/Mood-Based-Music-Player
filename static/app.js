@@ -32,6 +32,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const confirmScanBtn = document.getElementById("confirm-scan-btn");
     const cancelScanBtn = document.getElementById("cancel-scan-btn");
     const scanStatusEl = document.getElementById("scan-status");
+    const scanProgressEl = document.getElementById("scan-progress");
+    const scanProgressBar = document.getElementById("scan-progress-bar");
+    const scanStageEl = document.getElementById("scan-stage");
+    const scanPercentEl = document.getElementById("scan-percent");
+    const scanCurrentFileEl = document.getElementById("scan-current-file");
+    const scanCountEl = document.getElementById("scan-count");
+    const scanSongsTotalEl = document.getElementById("scan-songs-total");
+    const scanTimerEl = document.getElementById("scan-timer");
+    const scanEtaEl = document.getElementById("scan-eta");
 
     // --- Audio Player Logic ---
 
@@ -204,7 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <span class="title" title="${song.title}">${song.title}</span>
                 <span class="artist" title="${song.artist}">${song.artist}</span>
                 <span class="bpm">${song.bpm ? song.bpm.toFixed(0) : '-'}</span>
-                <span class="score">${(song.score * 100).toFixed(0)}%</span>
+                <span class="score">${song.score.toFixed(0)}%</span>
                 <span class="duration">Play</span> 
             `;
             div.addEventListener("click", () => loadSong(index));
@@ -216,12 +225,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     scanBtn.addEventListener("click", () => {
         scanModal.classList.remove("hidden");
+        scanProgressEl.classList.add("hidden");
+        scanProgressBar.style.width = '0%';
         // Poll status immediately to see if one is running
         checkScanStatus();
     });
 
     cancelScanBtn.addEventListener("click", () => {
         scanModal.classList.add("hidden");
+        scanProgressEl.classList.add("hidden");
+        scanProgressBar.style.width = '0%';
         if (scanInterval) clearInterval(scanInterval);
     });
 
@@ -261,13 +274,69 @@ document.addEventListener("DOMContentLoaded", () => {
         scanInterval = setInterval(checkScanStatus, 2000);
     }
 
+    function formatTime(seconds) {
+        if (!seconds) return '--:--';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
     async function checkScanStatus() {
         try {
             const res = await fetch("/scan/status");
             const status = await res.json();
             
+            // Show/hide progress section
+            if (status.is_scanning || status.stage !== 'idle') {
+                scanProgressEl.classList.remove("hidden");
+            }
+            
+            // Update stage
+            const stageNames = {
+                'scanning': 'Scanning files...',
+                'embedding': 'Building embeddings...',
+                'clap': 'Computing CLAP embeddings...',
+                'complete': 'Complete!',
+                'idle': 'Ready'
+            };
+            scanStageEl.innerText = stageNames[status.stage] || status.stage;
+            scanStageEl.className = 'stage-' + status.stage;
+            
+            // Update progress bar
+            const percent = status.total > 0 ? Math.round((status.current / status.total) * 100) : 0;
+            scanProgressBar.style.width = percent + '%';
+            scanPercentEl.innerText = percent + '%';
+            
+            // Update current file
+            scanCurrentFileEl.innerText = status.current_file || '';
+            
+            // Update counts - show "new" vs "existing"
+            const newFiles = status.current;
+            const totalFiles = status.total;
+            const existing = status.existing_songs || 0;
+            scanCountEl.innerText = `${newFiles} / ${totalFiles} new files`;
+            scanSongsTotalEl.innerText = `Total indexed: ${status.indexed_songs} (${existing} existing + ${newFiles} new)`;
+            
+            // Update timer and ETA
+            if (status.elapsed_seconds !== undefined && status.elapsed_seconds !== null) {
+                scanTimerEl.innerText = `${formatTime(status.elapsed_seconds)} elapsed`;
+            } else {
+                scanTimerEl.innerText = '--:-- elapsed';
+            }
+            
+            if (status.eta_seconds !== undefined && status.eta_seconds !== null && status.is_scanning) {
+                scanEtaEl.innerText = `ETA: ${formatTime(status.eta_seconds)}`;
+            } else if (!status.is_scanning && status.stage === 'complete') {
+                scanEtaEl.innerText = `Total time: ${formatTime(status.elapsed_seconds)}`;
+            } else if (status.is_scanning && newFiles > 0) {
+                scanEtaEl.innerText = 'ETA: calculating...';
+            } else {
+                scanEtaEl.innerText = 'ETA: --:--';
+            }
+            
+            // Show basic status for compatibility
             if (status.is_scanning) {
-                scanStatusEl.innerText = `Scanning... Indexed: ${status.indexed_songs} songs.`;
+                scanStatusEl.innerText = `Processing: ${status.current_file}`;
                 confirmScanBtn.disabled = true;
             } else {
                 if (scanInterval) {
@@ -275,6 +344,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     scanInterval = null;
                 }
                 scanStatusEl.innerText = `Scan Complete! Total songs: ${status.indexed_songs}`;
+                scanProgressBar.style.width = '100%';
+                scanPercentEl.innerText = '100%';
                 confirmScanBtn.disabled = false;
             }
         } catch (err) {

@@ -29,6 +29,11 @@ scan_status = {
     "current_file": "",
     "processed": 0,
     "total": 0,
+    "current": 0,
+    "stage": "idle",
+    "start_time": None,
+    "existing_count": 0,
+    "indexed_songs": None,
     "errors": [],
 }
 
@@ -117,6 +122,8 @@ def scan_library_endpoint(request: ScanRequest, background_tasks: BackgroundTask
     scan_status["is_scanning"] = True
     scan_status["processed"] = 0
     scan_status["errors"] = []
+    scan_status["start_time"] = None
+    scan_status["existing_count"] = database.get_song_count()
 
     # Run scan in background so we don't block
     background_tasks.add_task(
@@ -132,28 +139,74 @@ def scan_library_endpoint(request: ScanRequest, background_tasks: BackgroundTask
 def run_scan_with_status(
     path: str, enable_audio: bool, enable_lyrics: bool, enable_online_lyrics: bool
 ):
-    """Wrapper to update scan status"""
+    """Wrapper to update scan status with progress"""
     global scan_status
+    import time
+
+    scan_status["start_time"] = time.time()
+
+    def progress_callback(progress: dict):
+        scan_status["current"] = progress.get("current", 0)
+        scan_status["total"] = progress.get("total", 0)
+        scan_status["current_file"] = progress.get("current_file", "")
+        scan_status["stage"] = progress.get("stage", "scanning")
+        scan_status["indexed_songs"] = progress.get(
+            "indexed_songs", scan_status["existing_count"]
+        )
+
     try:
         scanner.scan_library(
             path,
             enable_audio=enable_audio,
             enable_lyrics=enable_lyrics,
             enable_online_lyrics=enable_online_lyrics,
+            progress_callback=progress_callback,
         )
     except Exception as e:
         scan_status["errors"].append(str(e))
     finally:
         scan_status["is_scanning"] = False
+        scan_status["stage"] = "complete"
 
 
 @app.get("/scan/status")
 def get_scan_status():
-    """Get current scan status"""
+    """Get current scan status with detailed progress"""
     song_count = len(database.get_all_songs())
+    existing_count = scan_status.get("existing_count", 0)
+    start_time = scan_status.get("start_time")
+
+    # Calculate ETA
+    eta_seconds = None
+    elapsed = 0
+    if start_time and scan_status.get("is_scanning"):
+        import time
+
+        elapsed = time.time() - start_time
+        current = scan_status.get("current", 0)
+        total = scan_status.get("total", 0)
+        if current > 0 and total > 0:
+            rate = current / elapsed
+            remaining = total - current
+            eta_seconds = remaining / rate if rate > 0 else None
+
+    # Use indexed_songs from scan_status during scan, otherwise from database
+    indexed_from_status = scan_status.get("indexed_songs")
+    display_indexed = (
+        indexed_from_status if indexed_from_status is not None else song_count
+    )
+
     return {
         "is_scanning": scan_status["is_scanning"],
-        "indexed_songs": song_count,
+        "indexed_songs": display_indexed,
+        "existing_songs": existing_count,
+        "current": scan_status.get("current", 0),
+        "total": scan_status.get("total", 0),
+        "current_file": scan_status.get("current_file", ""),
+        "stage": scan_status.get("stage", "idle"),
+        "start_time": start_time,
+        "elapsed_seconds": round(elapsed, 1),
+        "eta_seconds": round(eta_seconds, 1) if eta_seconds else None,
         "errors": scan_status["errors"],
     }
 

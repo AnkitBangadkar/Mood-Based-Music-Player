@@ -59,6 +59,12 @@ def init_db():
         "ALTER TABLE songs ADD COLUMN mode TEXT",
         "ALTER TABLE songs ADD COLUMN lyrics_emotion TEXT",
         "ALTER TABLE songs ADD COLUMN lyrics_emotion_score REAL",
+        "ALTER TABLE songs ADD COLUMN emotion_distribution TEXT",
+        # Phase 1: new audio features
+        "ALTER TABLE songs ADD COLUMN spectral_rolloff REAL",
+        "ALTER TABLE songs ADD COLUMN spectral_bandwidth REAL",
+        "ALTER TABLE songs ADD COLUMN dynamic_range REAL",
+        "ALTER TABLE songs ADD COLUMN mfccs TEXT",  # JSON string of 13 floats
     ]
     for migration in migrations:
         try:
@@ -89,6 +95,11 @@ def add_song(
     file_mtime=None,
     lyrics_emotion=None,
     lyrics_emotion_score=0.0,
+    emotion_distribution=None,
+    spectral_rolloff=None,
+    spectral_bandwidth=None,
+    dynamic_range=None,
+    mfccs=None,
 ):
     conn = get_connection()
     cursor = conn.cursor()
@@ -98,9 +109,10 @@ def add_song(
             INSERT OR REPLACE INTO songs (
                 filepath, file_mtime, title, artist, album, genre, rich_description, 
                 bpm, energy, brightness, valence, arousal, mode, sentiment, has_lyrics,
-                lyrics_vec, audio_vec, meta_vec, lyrics_emotion, lyrics_emotion_score
+                lyrics_vec, audio_vec, meta_vec, lyrics_emotion, lyrics_emotion_score,
+                emotion_distribution, spectral_rolloff, spectral_bandwidth, dynamic_range, mfccs
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 filepath,
@@ -123,6 +135,11 @@ def add_song(
                 meta_vec,
                 lyrics_emotion,
                 lyrics_emotion_score,
+                emotion_distribution,
+                spectral_rolloff,
+                spectral_bandwidth,
+                dynamic_range,
+                mfccs,
             ),
         )
         song_id = cursor.lastrowid

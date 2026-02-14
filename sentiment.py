@@ -68,45 +68,125 @@ class EmotionAnalyzer:
                 log.error(f"Failed to load emotion model: {e}")
                 self._loaded = True
 
+    def _split_into_chunks(self, text, max_chars=2500):
+        """
+        Split lyrics into chunks that fit within the model's token limit.
+        Each chunk is ~max_chars characters. Splits on paragraph/line boundaries.
+        DistilRoBERTa handles ~512 tokens which is roughly 2000-3000 chars.
+        """
+        text = text.strip()
+        if len(text) <= max_chars:
+            return [text]
+
+        chunks = []
+        paragraphs = text.split("\n\n")
+        current_chunk = ""
+
+        for para in paragraphs:
+            if len(current_chunk) + len(para) + 2 <= max_chars:
+                current_chunk += ("\n\n" + para) if current_chunk else para
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                # If a single paragraph exceeds max_chars, split by lines
+                if len(para) > max_chars:
+                    lines = para.split("\n")
+                    current_chunk = ""
+                    for line in lines:
+                        if len(current_chunk) + len(line) + 1 <= max_chars:
+                            current_chunk += ("\n" + line) if current_chunk else line
+                        else:
+                            if current_chunk:
+                                chunks.append(current_chunk.strip())
+                            current_chunk = line
+                else:
+                    current_chunk = para
+
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # Filter out very short chunks (< 30 chars) that add noise
+        return [c for c in chunks if len(c) >= 30] or [text[:max_chars]]
+
     def analyze(self, text):
         """
         Analyze lyrics text and return emotion info.
+        Uses chunk-based analysis for long lyrics to capture the full
+        emotional arc, then aggregates via weighted voting.
 
         Returns:
             dict: {
-                'emotion': str,      # e.g., 'joy', 'sadness', 'anger'
-                'score': float,      # confidence 0-1
-                'valence': float,   # -1 to +1 derived from emotion
-                'mood_words': list   # keywords to add to mood text
+                'emotion': str,           # dominant emotion label
+                'score': float,           # confidence 0-1
+                'valence': float,         # -1 to +1 (confidence-weighted)
+                'mood_words': list,       # keywords for mood text
+                'emotion_distribution': dict  # {emotion: avg_score} across all chunks
             }
         """
+        empty = {
+            "emotion": None,
+            "score": 0.0,
+            "valence": 0.0,
+            "mood_words": [],
+            "emotion_distribution": {},
+        }
+
         if not text or len(text.strip()) < 10:
-            return {"emotion": None, "score": 0.0, "valence": 0.0, "mood_words": []}
+            return empty
 
         self.load_model()
         if not self.pipeline:
-            return {"emotion": None, "score": 0.0, "valence": 0.0, "mood_words": []}
+            return empty
 
         try:
-            truncated = text[:512]
-            result = self.pipeline(truncated)[0]
+            chunks = self._split_into_chunks(text)
 
-            if result and len(result) > 0:
-                top_emotion = result[0]["label"]
-                top_score = result[0]["score"]
-                valence = EMOTION_TO_VALENCE.get(top_emotion, 0.0)
-                mood_words = EMOTION_MOOD_KEYWORDS.get(top_emotion, [])[:2]
+            # Accumulate emotion scores across all chunks
+            emotion_totals = {e: 0.0 for e in EMOTION_TO_VALENCE}
+            num_chunks = len(chunks)
 
-                return {
-                    "emotion": top_emotion,
-                    "score": float(top_score),
-                    "valence": valence,
-                    "mood_words": mood_words,
-                }
+            for chunk in chunks:
+                result = self.pipeline(chunk)[0]
+                if result:
+                    for item in result:
+                        label = item["label"]
+                        if label in emotion_totals:
+                            emotion_totals[label] += item["score"]
+
+            # Average across chunks
+            emotion_avg = {e: emotion_totals[e] / num_chunks for e in emotion_totals}
+
+            # Dominant emotion is the one with highest average score
+            top_emotion = max(emotion_avg, key=emotion_avg.get)
+            top_score = emotion_avg[top_emotion]
+
+            # Confidence-weighted valence: use full distribution instead of just top-1
+            # Each emotion contributes its valence proportional to its score
+            valence = sum(EMOTION_TO_VALENCE[e] * emotion_avg[e] for e in emotion_avg)
+
+            # Mood words from top emotion, plus secondary if it's strong enough
+            mood_words = list(EMOTION_MOOD_KEYWORDS.get(top_emotion, [])[:2])
+            sorted_emotions = sorted(
+                emotion_avg.items(), key=lambda x: x[1], reverse=True
+            )
+            if len(sorted_emotions) > 1 and sorted_emotions[1][1] > 0.2:
+                secondary = sorted_emotions[1][0]
+                secondary_words = EMOTION_MOOD_KEYWORDS.get(secondary, [])[:1]
+                mood_words.extend(secondary_words)
+
+            return {
+                "emotion": top_emotion,
+                "score": float(top_score),
+                "valence": float(valence),
+                "mood_words": mood_words,
+                "emotion_distribution": {
+                    e: round(s, 4) for e, s in emotion_avg.items()
+                },
+            }
         except Exception as e:
             log.warning(f"Emotion analysis failed: {e}")
 
-        return {"emotion": None, "score": 0.0, "valence": 0.0, "mood_words": []}
+        return empty
 
 
 _analyzer = EmotionAnalyzer()

@@ -78,11 +78,32 @@
 
     <!-- Scan Modal -->
     <div id="scan-modal" class="modal-overlay hidden">
-        <div class="modal-content">
+        <div class="modal-content scan-modal">
             <h2>Scan Library</h2>
             <p style="margin-bottom:1rem; font-size:0.9rem; color:#aaa;">Enter the absolute path to your music folder.</p>
             <input type="text" id="scan-path-input" placeholder="/home/user/Music">
-            <div style="display:flex; gap:1rem; justify-content:center;">
+            
+            <!-- Progress Section -->
+            <div id="scan-progress" class="scan-progress hidden">
+                <div class="progress-header">
+                    <span id="scan-stage">Preparing...</span>
+                    <span id="scan-percent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div id="scan-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
+                </div>
+                <div id="scan-current-file" class="scan-current-file"></div>
+                <div class="progress-stats">
+                    <span id="scan-count">0 / 0 files</span>
+                    <span id="scan-timer">--:-- elapsed</span>
+                </div>
+                <div class="progress-stats">
+                    <span id="scan-songs-total">Total indexed: 0</span>
+                    <span id="scan-eta">ETA: --:--</span>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:1rem; justify-content:center; margin-top: 1rem;">
                 <button class="secondary" id="cancel-scan-btn">Cancel</button>
                 <button id="confirm-scan-btn">Start Scan</button>
             </div>

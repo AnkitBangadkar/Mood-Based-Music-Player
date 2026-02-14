@@ -24,6 +24,7 @@ log = get_logger("Analyzer")
 # Pitch class names for key detection
 PITCH_CLASSES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
+
 # Krumhansl-Kessler key profiles (from music cognition research)
 # These represent the "ideal" distribution of pitch classes for each key
 MAJOR_PROFILE = np.array(
@@ -34,14 +35,17 @@ MINOR_PROFILE = np.array(
 )
 
 
-def analyze_track(filepath, duration=60, offset=30):
+def analyze_track(filepath, duration=90, offset=15):
     """
     Analyzes an audio file to extract semantic music theory data.
 
+    Uses single-pass BPM estimation with octave correction (threshold 0.22).
+    Loads 90s starting at offset 15s for better coverage.
+
     Args:
         filepath (str): Path to audio file.
-        duration (int): How many seconds to analyze.
-        offset (int): Where to start (skip intro).
+        duration (int): How many seconds to analyze (default 90s).
+        offset (int): Where to start (default 15s, skip intro).
 
     Returns:
         dict with audio features and mood descriptors.
@@ -60,7 +64,7 @@ def analyze_track(filepath, duration=60, offset=30):
 
     # === CORE FEATURES ===
 
-    # 1. Tempo (BPM)
+    # 1. Tempo (BPM) - Single pass (multi-seg removed: 2.5x slower, no accuracy gain)
     try:
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         bpm = float(tempo) if not isinstance(tempo, np.ndarray) else float(tempo[0])
@@ -70,6 +74,13 @@ def analyze_track(filepath, duration=60, offset=30):
     # 2. Energy (RMS)
     rms = librosa.feature.rms(y=y)
     energy = float(np.mean(rms))
+
+    # 2b. BPM octave correction using energy as sanity check
+    # Threshold raised from 0.18 to 0.22 to fix death bed (energy=0.2035, BPM 143.6->71.8)
+    if bpm > 140 and energy < 0.22:
+        bpm /= 2
+    elif bpm < 55:
+        bpm *= 2
 
     # 3. Spectral Centroid (Brightness)
     cent = librosa.feature.spectral_centroid(y=y, sr=sr)
@@ -92,6 +103,37 @@ def analyze_track(filepath, duration=60, offset=30):
     harmonic, percussive = librosa.effects.hpss(y)
     harmonic_ratio = float(np.mean(np.abs(harmonic)) / (np.mean(np.abs(y)) + 1e-6))
 
+    # 8. Onset strength variance (rhythm regularity)
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+    onset_variance = float(np.var(onset_env))
+
+    # === NEW PHASE 1 FEATURES ===
+
+    # 9. MFCCs (13 coefficients) - THE most important music classification feature
+    # Captures timbral texture/shape. Distinguishes songs with similar BPM/energy
+    # but vastly different sound (e.g., Cruel Angel's Thesis vs death bed)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+    mfccs = [round(float(np.mean(mfcc[i])), 4) for i in range(13)]
+
+    # 10. Spectral Rolloff - frequency below which 85% of spectral energy lies
+    # Separates bright pop (high rolloff) from dark ambient (low rolloff)
+    rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+    spectral_rolloff = float(np.mean(rolloff))
+
+    # 11. Spectral Bandwidth - width of the frequency spread
+    # Full-range production (high) vs narrow/thin sound (low)
+    bw = librosa.feature.spectral_bandwidth(y=y, sr=sr)
+    spectral_bandwidth = float(np.mean(bw))
+
+    # 12. Dynamic Range - log-scaled ratio of loud to quiet RMS frames
+    # Uses 95th/5th percentiles to avoid blowup from silence.
+    # Log scale compresses the range: raw ratio 1-237K → log1p → ~0.7-12.4
+    # Most songs cluster in 0.7-3.5 on log scale. Prevents outlier dominance.
+    rms_flat = rms.flatten()
+    rms_p95 = float(np.percentile(rms_flat, 95))
+    rms_p5 = float(np.percentile(rms_flat, 5))
+    dynamic_range = float(np.log1p(rms_p95 / (rms_p5 + 1e-6)))
+
     # === MOOD/VALENCE ESTIMATION ===
     valence = estimate_valence(
         bpm, energy, brightness, mode, spectral_contrast, zero_crossing, key_confidence
@@ -113,6 +155,11 @@ def analyze_track(filepath, duration=60, offset=30):
         "spectral_contrast": round(spectral_contrast, 2),
         "zero_crossing": round(zero_crossing, 4),
         "harmonic_ratio": round(harmonic_ratio, 2),
+        "onset_variance": round(onset_variance, 4),
+        "spectral_rolloff": round(spectral_rolloff, 1),
+        "spectral_bandwidth": round(spectral_bandwidth, 1),
+        "dynamic_range": round(dynamic_range, 2),
+        "mfccs": mfccs,
         "description": description,
     }
 
@@ -188,9 +235,13 @@ def estimate_valence(bpm, energy, brightness, mode, contrast, zcr, key_confidenc
     """
     valence = 0.0
 
-    # Mode contribution scaled by confidence
-    # If key detection is uncertain, reduce mode's impact on valence
-    mode_weight = 0.3 * key_confidence
+    # Mode contribution: GATED by confidence threshold
+    # Below 0.65 confidence, mode detection is unreliable — treat as neutral
+    # Above 0.65, scale linearly: 0.65→0, 1.0→0.3
+    if key_confidence >= 0.65:
+        mode_weight = 0.3 * (key_confidence - 0.65) / 0.35
+    else:
+        mode_weight = 0.0
 
     if mode == "major":
         valence += mode_weight
@@ -222,17 +273,23 @@ def estimate_arousal(bpm, energy, contrast):
     """
     Estimates arousal (energy/excitement level) from audio features.
 
+    Calibrated for actual data ranges:
+      - BPM: 55-200 (after octave correction), centered at 80 for calm baseline
+      - Energy (RMS): 0.054-0.386 (mean 0.246), linearly mapped
+      - Contrast: 15-35 typical range
+
     Returns:
         float: 0 (very calm) to 1 (very energetic)
     """
     arousal = 0.0
 
-    # BPM is primary arousal indicator
+    # BPM contribution: 80 BPM → 0 (calm baseline), 240 BPM → 0.5
     if bpm > 0:
-        arousal += np.clip((bpm - 60) / 140, 0, 0.5)  # 60-200 BPM → 0-0.5
+        arousal += np.clip((bpm - 80) / 160, 0, 0.5)
 
-    # Energy (RMS) contribution
-    arousal += np.clip(energy * 3, 0, 0.3)  # Typical RMS 0-0.15 → 0-0.3
+    # Energy (RMS) contribution: linear map across actual range
+    # 0.05 → 0, 0.40 → 0.3 (actual range is 0.054-0.386)
+    arousal += np.clip((energy - 0.05) / 0.35, 0, 1) * 0.3
 
     # Spectral contrast adds excitement
     arousal += np.clip((contrast - 15) / 50, 0, 0.2)
