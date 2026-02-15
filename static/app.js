@@ -123,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (isPlaying) {
                     indexSpan.innerHTML = '<i data-lucide="volume-2" class="playing-indicator"></i>';
                 } else {
-                    indexSpan.innerHTML = `<span>${i + 1}</span><i data-lucide="pause"></i>`;
+                    indexSpan.innerHTML = '<i data-lucide="pause" class="paused-indicator"></i>';
                 }
             } else {
                 indexSpan.innerHTML = `<span>${i + 1}</span><i data-lucide="play"></i>`;
@@ -392,7 +392,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateLibraryButton() {
         // Update library button text based on state
         const songCount = lastScanStats.songCount || 0;
-        libraryBtnText.innerText = songCount > 0 ? `${songCount} songs` : 'Library';
+        const elapsed = lastScanStats.elapsed;
+        
+        if (songCount > 0 && elapsed) {
+            libraryBtnText.innerText = `${songCount} songs`;
+        } else if (songCount > 0) {
+            libraryBtnText.innerText = `${songCount} songs`;
+        } else {
+            libraryBtnText.innerText = 'Library';
+        }
         
         // Update dropdown stats with elapsed time
         if (songCount > 0) {
@@ -445,10 +453,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     showProgressBtn.addEventListener("click", () => {
-        scanProgressPanel.classList.remove("hidden");
-        isScanMinimized = false;
-        libraryProgress.classList.add("hidden");
         hideLibraryDropdown();
+        const savedStats = JSON.parse(localStorage.getItem('lastScanStats') || '{}');
+        if (savedStats.elapsed && savedStats.songCount) {
+            showCompletedScanPanel(savedStats);
+        } else {
+            scanProgressPanel.classList.remove("hidden");
+            isScanMinimized = false;
+            libraryProgress.classList.add("hidden");
+        }
     });
 
     // Flush library handlers
@@ -508,12 +521,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Scanning Logic ---
 
+    function showCompletedScanPanel(stats) {
+        scanProgressPanel.classList.remove("hidden");
+        isScanMinimized = false;
+        libraryProgress.classList.add("hidden");
+        
+        scanPanelTitle.innerText = 'Scan Complete!';
+        scanPanelStage.innerHTML = '<i data-lucide="check-circle"></i> Scan complete!';
+        scanPanelProgressFill.style.width = '100%';
+        scanPanelPercent.innerText = '100%';
+        scanPanelPercent.className = 'scan-percent complete';
+        scanPanelElapsed.innerText = formatDuration(stats.elapsed) + ' elapsed';
+        scanPanelEta.innerText = 'Done in ' + formatDuration(stats.elapsed);
+        scanPanelEta.className = 'scan-eta complete';
+        scanPanelCurrent.innerText = `${stats.files || 0} / ${stats.files || 0} files`;
+        scanPanelTotal.innerText = `${stats.songCount} songs indexed`;
+        scanPanelFile.innerText = '';
+        scanCompleteActions.classList.remove("hidden");
+        
+        lucide.createIcons();
+    }
+
     function minimizeScanPanel() {
         scanProgressPanel.classList.add("hidden");
         isScanMinimized = true;
-        // Show progress indicator on library button
         const percent = scanPanelPercent.innerText;
-        if (percent !== '0%') {
+        const isComplete = percent === '100%';
+        
+        if (isComplete) {
+            const stats = JSON.parse(localStorage.getItem('lastScanStats') || '{}');
+            if (stats.elapsed) {
+                libraryProgress.innerText = formatDuration(stats.elapsed);
+                libraryProgress.classList.remove("hidden");
+            }
+        } else if (percent !== '0%') {
             libraryProgress.innerText = percent;
             libraryProgress.classList.remove("hidden");
         }
@@ -682,6 +723,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 lastScanStats = {
                     songCount: status.indexed_songs,
                     elapsed: status.elapsed_seconds,
+                    files: status.total,
                     timestamp: Date.now()
                 };
                 localStorage.setItem('lastScanStats', JSON.stringify(lastScanStats));
