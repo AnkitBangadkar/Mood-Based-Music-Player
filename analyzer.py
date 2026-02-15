@@ -62,6 +62,10 @@ def analyze_track(filepath, duration=90, offset=15):
     if len(y) == 0:
         return None
 
+    # Normalize audio volume so RMS/energy is consistent across all files
+    # This prevents quiet rips from being misclassified as low energy
+    y = librosa.util.normalize(y)
+
     # === CORE FEATURES ===
 
     # 1. Tempo (BPM) - Single pass (multi-seg removed: 2.5x slower, no accuracy gain)
@@ -138,7 +142,7 @@ def analyze_track(filepath, duration=90, offset=15):
     valence = estimate_valence(
         bpm, energy, brightness, mode, spectral_contrast, zero_crossing, key_confidence
     )
-    arousal = estimate_arousal(bpm, energy, spectral_contrast)
+    arousal = estimate_arousal(bpm, energy)
 
     # === SEMANTIC DESCRIPTION ===
     description = build_description(bpm, energy, brightness, mode, valence, arousal)
@@ -175,8 +179,9 @@ def detect_key(y, sr):
         tuple: (key_name, mode, confidence)
         e.g., ('C', 'major', 0.85)
     """
-    # Compute chromagram (12 pitch classes)
-    chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
+    # Compute chromagram (12 pitch classes) using STFT for speed
+    # (CQT is more precise but significantly slower)
+    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
     chroma_mean = np.mean(chroma, axis=1)
 
     # Normalize
@@ -269,14 +274,13 @@ def estimate_valence(bpm, energy, brightness, mode, contrast, zcr, key_confidenc
     return np.clip(valence, -1, 1)
 
 
-def estimate_arousal(bpm, energy, contrast):
+def estimate_arousal(bpm, energy):
     """
     Estimates arousal (energy/excitement level) from audio features.
 
     Calibrated for actual data ranges:
       - BPM: 55-200 (after octave correction), centered at 80 for calm baseline
       - Energy (RMS): 0.054-0.386 (mean 0.246), linearly mapped
-      - Contrast: 15-35 typical range
 
     Returns:
         float: 0 (very calm) to 1 (very energetic)
@@ -284,15 +288,13 @@ def estimate_arousal(bpm, energy, contrast):
     arousal = 0.0
 
     # BPM contribution: 80 BPM → 0 (calm baseline), 240 BPM → 0.5
+    # Allow negative drag for very slow songs (55 BPM) to pull arousal down
     if bpm > 0:
-        arousal += np.clip((bpm - 80) / 160, 0, 0.5)
+        arousal += np.clip((bpm - 80) / 160, -0.2, 0.5)
 
     # Energy (RMS) contribution: linear map across actual range
     # 0.05 → 0, 0.40 → 0.3 (actual range is 0.054-0.386)
     arousal += np.clip((energy - 0.05) / 0.35, 0, 1) * 0.3
-
-    # Spectral contrast adds excitement
-    arousal += np.clip((contrast - 15) / 50, 0, 0.2)
 
     return np.clip(arousal, 0, 1)
 

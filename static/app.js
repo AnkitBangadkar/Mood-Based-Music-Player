@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Audio Player Logic ---
 
-    function loadSong(index) {
+    function loadSong(index, autoPlay = true) {
         if (index < 0 || index >= queue.length) return;
         
         currentIndex = index;
@@ -54,30 +54,81 @@ document.addEventListener("DOMContentLoaded", () => {
         audioPlayer.src = `/audio/${song.id}`;
         audioPlayer.load();
 
-        // Update UI
+        // Update UI - now playing info
         npTitle.innerText = song.title;
-        npArtist.innerText = song.artist;
+        npArtist.innerText = song.artist + (song.album ? ` • ${song.album}` : '');
         
         // Update Active Class in List
         document.querySelectorAll("#song-list .song-item").forEach((el, i) => {
             el.classList.toggle("active", i === currentIndex);
+            el.classList.remove("playing"); // Remove playing class initially
         });
+        
+        // Update playing state in list
+        updateSongListPlayingState();
 
-        // Play
-        playSong();
+        // Scroll to active song
+        const activeItem = document.querySelector("#song-list .song-item.active");
+        if (activeItem) {
+            activeItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        // Only play if autoPlay is true
+        if (autoPlay) {
+            playSong();
+        } else {
+            // Still update icons to show paused state
+            updatePlayPauseIcon();
+            updateSongListPlayingState();
+        }
+    }
+
+    function updatePlayPauseIcon() {
+        const icon = playPauseBtn.querySelector('i');
+        if (icon) {
+            icon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
+            lucide.createIcons();
+        }
+    }
+
+    function updateSongListPlayingState() {
+        // Update all song items to show/hide playing indicator
+        document.querySelectorAll("#song-list .song-item").forEach((el, i) => {
+            const indexSpan = el.querySelector('.index');
+            if (i === currentIndex) {
+                if (isPlaying) {
+                    indexSpan.innerHTML = '<i data-lucide="volume-2" class="playing-indicator"></i>';
+                } else {
+                    indexSpan.innerHTML = `<span>${i + 1}</span><i data-lucide="pause"></i>`;
+                }
+            } else {
+                indexSpan.innerHTML = `<span>${i + 1}</span><i data-lucide="play"></i>`;
+            }
+        });
+        lucide.createIcons();
     }
 
     function playSong() {
         audioPlayer.play().then(() => {
             isPlaying = true;
-            playPauseBtn.innerText = "⏸"; // Pause icon
+            // Add playing class to active song
+            document.querySelectorAll("#song-list .song-item").forEach((el, i) => {
+                el.classList.toggle("playing", i === currentIndex);
+            });
+            updatePlayPauseIcon();
+            updateSongListPlayingState();
         }).catch(err => console.error("Play error:", err));
     }
 
     function pauseSong() {
         audioPlayer.pause();
         isPlaying = false;
-        playPauseBtn.innerText = "▶"; // Play icon
+        // Remove playing class from active song
+        document.querySelectorAll("#song-list .song-item").forEach((el, i) => {
+            el.classList.remove("playing");
+        });
+        updatePlayPauseIcon();
+        updateSongListPlayingState();
     }
 
     function togglePlay() {
@@ -158,19 +209,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
     repeatBtn.addEventListener("click", () => {
         isRepeating = !isRepeating;
-        repeatBtn.innerText = isRepeating ? "🔂" : "🔁";
         repeatBtn.classList.toggle("active", isRepeating);
     });
 
     // --- Playlist Generation ---
+
+    // Enter key to generate
+    promptInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            generateBtn.click();
+        }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+        // Don't trigger if typing in input
+        if (e.target.tagName === "INPUT") return;
+        
+        switch(e.code) {
+            case "Space":
+                e.preventDefault();
+                togglePlay();
+                break;
+            case "ArrowRight":
+                nextSong();
+                break;
+            case "ArrowLeft":
+                prevSong();
+                break;
+            case "KeyM":
+                // Mute/unmute
+                if (audioPlayer.volume > 0) {
+                    audioPlayer.dataset.prevVolume = audioPlayer.volume;
+                    audioPlayer.volume = 0;
+                    volumeSlider.value = 0;
+                } else {
+                    audioPlayer.volume = audioPlayer.dataset.prevVolume || 0.8;
+                    volumeSlider.value = audioPlayer.volume;
+                }
+                break;
+        }
+    });
 
     generateBtn.addEventListener("click", async () => {
         const prompt = promptInput.value.trim();
         if (!prompt) return;
 
         generateBtn.disabled = true;
-        generateBtn.innerText = "Generating...";
-        songListEl.innerHTML = '<div style="text-align:center; padding: 2rem;">Searching specifically for "' + prompt + '"...</div>';
+        generateBtn.innerHTML = '<i data-lucide="loader-2" class="loading"></i> Generating...';
+        lucide.createIcons();
+        songListEl.innerHTML = '<div class="empty-state"><i data-lucide="loader-2" class="loading"></i><p>Searching for "' + prompt + '"...</p></div>';
+        lucide.createIcons();
 
         try {
             const res = await fetch("/generate", {
@@ -184,22 +273,40 @@ document.addEventListener("DOMContentLoaded", () => {
             const songs = await res.json();
             queue = songs; // Replace queue with new results
             currentIndex = 0;
+            
+            // Calculate total duration
+            const totalDuration = songs.reduce((acc, s) => acc + (s.duration || 0), 0);
+            const totalMins = Math.floor(totalDuration / 60);
+            
             renderSongList();
             
+            // Add playlist stats header
             if (queue.length > 0) {
+                const statsDiv = document.createElement("div");
+                statsDiv.className = "playlist-stats";
+                statsDiv.innerHTML = `
+                    <span><i data-lucide="music"></i> ${queue.length} songs</span>
+                    <span><i data-lucide="clock"></i> ${totalMins} min total</span>
+                `;
+                songListEl.insertBefore(statsDiv, songListEl.firstChild);
+                lucide.createIcons();
+                
                 // Don't auto-play, just load first song
-                loadSong(0);
+                loadSong(0, false);
                 pauseSong(); 
             } else {
-                songListEl.innerHTML = '<div style="text-align:center; padding: 2rem;">No songs found matching that mood.</div>';
+                songListEl.innerHTML = '<div class="empty-state"><i data-lucide="search-x"></i><p>No songs found matching that mood.</p></div>';
+                lucide.createIcons();
             }
 
         } catch (err) {
             console.error(err);
-            songListEl.innerHTML = `<div style="text-align:center; padding: 2rem; color:red;">Error: ${err.message}</div>`;
+            songListEl.innerHTML = `<div class="empty-state"><i data-lucide="alert-circle"></i><p>Error: ${err.message}</p></div>`;
+            lucide.createIcons();
         } finally {
             generateBtn.disabled = false;
-            generateBtn.innerText = "Generate Playlist";
+            generateBtn.innerHTML = '<i data-lucide="wand-2"></i> Generate Playlist';
+            lucide.createIcons();
         }
     });
 
@@ -208,23 +315,59 @@ document.addEventListener("DOMContentLoaded", () => {
         queue.forEach((song, index) => {
             const div = document.createElement("div");
             div.className = `song-item ${index === currentIndex ? 'active' : ''}`;
+            
+            // Arousal: 0-100 (calm to excited)
+            const arousal = song.arousal !== undefined && song.arousal !== null ? Math.round(song.arousal * 100) : null;
+            // Valence: -100 to +100 (sad to happy), normalize to 0-100 for display
+            const valence = song.valence !== undefined && song.valence !== null ? Math.round((song.valence + 1) * 50) : null;
+            
+            // Determine mood label based on valence/arousal (2D circumplex model)
+            let moodLabel = '-';
+            if (valence !== null && arousal !== null) {
+                // High arousal = top, Low arousal = bottom
+                // High valence = right, Low valence = left
+                if (valence > 60 && arousal > 60) moodLabel = 'Excited';
+                else if (valence > 60 && arousal < 40) moodLabel = 'Content';
+                else if (valence < 40 && arousal > 60) moodLabel = 'Angry';
+                else if (valence < 40 && arousal < 40) moodLabel = 'Sad';
+                else if (arousal > 70) moodLabel = 'Energetic';
+                else if (valence > 70) moodLabel = 'Happy';
+                else if (valence < 30) moodLabel = 'Depressed';
+                else if (arousal < 30) moodLabel = 'Calm';
+                else moodLabel = 'Neutral';
+            }
+            
             div.innerHTML = `
-                <span class="index">${index + 1}</span>
-                <span class="title" title="${song.title}">${song.title}</span>
-                <span class="artist" title="${song.artist}">${song.artist}</span>
-                <span class="bpm">${song.bpm ? song.bpm.toFixed(0) : '-'}</span>
-                <span class="score">${song.score.toFixed(0)}%</span>
-                <span class="duration">Play</span> 
+                <span class="index">
+                    ${index === currentIndex && isPlaying 
+                        ? `<i data-lucide="volume-2" class="playing-indicator"></i>` 
+                        : `<span>${index + 1}</span><i data-lucide="play"></i>`}
+                </span>
+                <div class="title-col">
+                    <span class="title" title="${song.title}">${song.title}</span>
+                    <span class="artist" title="${song.artist}">${song.artist}</span>
+                </div>
+                <span class="album" title="${song.album}">${song.album || '-'}</span>
+                <div class="mood-badges">
+                    ${arousal !== null ? `<span class="mood-badge energy" title="Arousal: ${arousal}% (Calm ↔ Excited)"><i data-lucide="zap"></i>${arousal}%</span>` : '-'}
+                </div>
+                <div class="mood-badges">
+                    ${valence !== null ? `<span class="mood-badge valence" title="Valence: ${valence}% (Sad ↔ Happy) - ${moodLabel}"><i data-lucide="heart"></i>${valence}%</span>` : '-'}
+                </div>
+                <span class="score">${song.score ? song.score.toFixed(0) + '%' : '-'}</span>
+                <span class="duration">${formatTime(song.duration)}</span>
             `;
             div.addEventListener("click", () => loadSong(index));
             songListEl.appendChild(div);
         });
+        lucide.createIcons();
     }
 
     // --- Scanning Logic ---
 
     scanBtn.addEventListener("click", () => {
         scanModal.classList.remove("hidden");
+        scanModal.classList.add("visible");
         scanProgressEl.classList.add("hidden");
         scanProgressBar.style.width = '0%';
         // Poll status immediately to see if one is running
@@ -233,6 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     cancelScanBtn.addEventListener("click", () => {
         scanModal.classList.add("hidden");
+        scanModal.classList.remove("visible");
         scanProgressEl.classList.add("hidden");
         scanProgressBar.style.width = '0%';
         if (scanInterval) clearInterval(scanInterval);

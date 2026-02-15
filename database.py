@@ -176,7 +176,7 @@ def get_songs_by_ids(song_ids):
     placeholders = ",".join("?" * len(song_ids))
     cursor.execute(f"SELECT * FROM songs WHERE id IN ({placeholders})", song_ids)
     songs = cursor.fetchall()
-    return {song["id"]: song for song in songs}
+    return {song["id"]: dict(song) for song in songs}
 
 
 def get_existing_songs():

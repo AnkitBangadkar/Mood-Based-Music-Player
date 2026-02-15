@@ -3,16 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mood Playlist Generator</title>
+    <title>SoulSeek - Mood Playlist Generator</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
 <body>
 
     <!-- Header -->
     <header>
-        <h1>🎵 Mood Playlist Generator</h1>
+        <div class="logo">
+            <div class="logo-icon">
+                <i data-lucide="music"></i>
+            </div>
+            <h1>SoulSeek</h1>
+        </div>
         <div class="scan-controls">
-            <button class="secondary" id="scan-btn">Scan Library</button>
+            <button class="secondary" id="scan-btn">
+                <i data-lucide="folder-search"></i>
+                Scan Library
+            </button>
         </div>
     </header>
 
@@ -21,7 +30,10 @@
         <!-- Generator Panel -->
         <section class="generator-panel">
             <input type="text" id="prompt-input" placeholder="Describe a mood (e.g., 'Sad songs for a rainy day')..." autocomplete="off">
-            <button id="generate-btn">Generate Playlist</button>
+            <button class="primary" id="generate-btn">
+                <i data-lucide="wand-2"></i>
+                Generate Playlist
+            </button>
         </section>
 
         <!-- Results / Queue -->
@@ -29,15 +41,17 @@
             <div class="song-headers song-item">
                 <span class="index">#</span>
                 <span class="title">Title</span>
-                <span class="artist">Artist</span>
-                <span class="bpm">BPM</span>
+                <span class="album">Album</span>
+                <span class="bpm">Arousal</span>
+                <span class="bpm">Valence</span>
                 <span class="score">Match</span>
-                <span class="duration">Dur</span>
+                <span class="duration">Time</span>
             </div>
             <div id="song-list" class="song-list">
                 <!-- Songs will be injected here -->
-                <div style="text-align:center; padding: 2rem; color: #666;">
-                    Generate a playlist to see songs here.
+                <div class="empty-state">
+                    <i data-lucide="music-2"></i>
+                    <p>Generate a playlist to see songs here.</p>
                 </div>
             </div>
         </section>
@@ -47,18 +61,30 @@
     <footer class="player-bar">
         <!-- Song Info -->
         <div class="now-playing">
-            <div class="now-playing-title" id="np-title">No Song Selected</div>
-            <div class="now-playing-artist" id="np-artist">-</div>
+            <div class="now-playing-info">
+                <div class="now-playing-title" id="np-title">No Song Selected</div>
+                <div class="now-playing-artist" id="np-artist">-</div>
+            </div>
         </div>
 
         <!-- Controls -->
         <div class="player-controls">
             <div class="control-buttons">
-                <button class="control-btn" id="shuffle-btn" title="Shuffle">🔀</button>
-                <button class="control-btn" id="prev-btn" title="Previous">⏮</button>
-                <button class="play-pause-btn" id="play-pause-btn" title="Play/Pause">▶</button>
-                <button class="control-btn" id="next-btn" title="Next">⏭</button>
-                <button class="control-btn" id="repeat-btn" title="Repeat">🔁</button>
+                <button class="control-btn" id="shuffle-btn" title="Shuffle">
+                    <i data-lucide="shuffle"></i>
+                </button>
+                <button class="control-btn" id="prev-btn" title="Previous">
+                    <i data-lucide="skip-back"></i>
+                </button>
+                <button class="control-btn play-pause" id="play-pause-btn" title="Play/Pause">
+                    <i data-lucide="play"></i>
+                </button>
+                <button class="control-btn" id="next-btn" title="Next">
+                    <i data-lucide="skip-forward"></i>
+                </button>
+                <button class="control-btn" id="repeat-btn" title="Repeat">
+                    <i data-lucide="repeat"></i>
+                </button>
             </div>
             
             <!-- Progress -->
@@ -71,7 +97,7 @@
 
         <!-- Volume -->
         <div class="volume-controls">
-            <span>🔊</span>
+            <i data-lucide="volume-2"></i>
             <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="0.8">
         </div>
     </footer>
@@ -80,14 +106,14 @@
     <div id="scan-modal" class="modal-overlay hidden">
         <div class="modal-content scan-modal">
             <h2>Scan Library</h2>
-            <p style="margin-bottom:1rem; font-size:0.9rem; color:#aaa;">Enter the absolute path to your music folder.</p>
+            <p>Enter the absolute path to your music folder.</p>
             <input type="text" id="scan-path-input" placeholder="/home/user/Music">
             
             <!-- Progress Section -->
             <div id="scan-progress" class="scan-progress hidden">
                 <div class="progress-header">
-                    <span id="scan-stage">Preparing...</span>
-                    <span id="scan-percent">0%</span>
+                    <span class="stage" id="scan-stage">Preparing...</span>
+                    <span class="percent" id="scan-percent">0%</span>
                 </div>
                 <div class="progress-bar-container">
                     <div id="scan-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
@@ -103,11 +129,17 @@
                 </div>
             </div>
             
-            <div style="display:flex; gap:1rem; justify-content:center; margin-top: 1rem;">
-                <button class="secondary" id="cancel-scan-btn">Cancel</button>
-                <button id="confirm-scan-btn">Start Scan</button>
+            <div class="modal-buttons">
+                <button class="secondary" id="cancel-scan-btn">
+                    <i data-lucide="x"></i>
+                    Cancel
+                </button>
+                <button class="primary" id="confirm-scan-btn">
+                    <i data-lucide="search"></i>
+                    Start Scan
+                </button>
             </div>
-            <div id="scan-status" style="margin-top:1rem; font-size:0.9rem;"></div>
+            <div id="scan-status"></div>
         </div>
     </div>
 
@@ -115,5 +147,8 @@
     <audio id="audio-player"></audio>
 
     <script src="/static/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>

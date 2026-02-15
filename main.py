@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import uvicorn
 import os
 import mimetypes
+import mutagen
 import scanner
 import database
 import engine
@@ -60,6 +61,8 @@ class SongResponse(BaseModel):
     bpm: Optional[float] = None
     energy: Optional[float] = None
     valence: Optional[float] = None
+    arousal: Optional[float] = None
+    duration: Optional[float] = None
     has_lyrics: Optional[bool] = None
     score: Optional[float] = None
 
@@ -219,6 +222,15 @@ def generate_playlist(request: GenerateRequest):
     for song_id, score in results:
         song = database.get_song_by_id(song_id)
         if song:
+            # Get duration from mutagen
+            duration = 0
+            try:
+                audio = mutagen.File(song["filepath"])
+                if audio:
+                    duration = getattr(audio.info, "length", 0)
+            except:
+                pass
+
             response.append(
                 {
                     "id": song["id"],
@@ -230,6 +242,8 @@ def generate_playlist(request: GenerateRequest):
                     "bpm": song["bpm"],
                     "energy": song["energy"],
                     "valence": song["valence"],
+                    "arousal": song["arousal"],
+                    "duration": duration,
                     "has_lyrics": bool(song["has_lyrics"]),
                     "score": float(score),
                 }
