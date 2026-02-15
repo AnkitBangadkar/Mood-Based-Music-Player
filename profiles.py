@@ -198,7 +198,7 @@ FEATURE_PROFILES = {
     },
     # ─── NEGATIVE VALENCE (Sad/Melancholy) ───
     "sad": {
-        "valence": (-0.2, 1.0),
+        "valence": (-0.7, 1.0),
         "arousal": (0.3, 0.5),
         "mode_major": (False, 0.6),
         "bpm": (80, 0.4),
@@ -208,7 +208,7 @@ FEATURE_PROFILES = {
         "mfcc2": (-8.0, 0.2),
     },
     "melancholy": {
-        "valence": (-0.2, 1.0),
+        "valence": (-0.7, 1.0),
         "arousal": (0.25, 0.6),
         "mode_major": (False, 0.6),
         "bpm": (80, 0.5),
@@ -217,7 +217,7 @@ FEATURE_PROFILES = {
         "mfcc2": (-8.0, 0.2),
     },
     "somber": {
-        "valence": (-0.25, 1.0),
+        "valence": (-0.75, 1.0),
         "arousal": (0.2, 0.7),
         "mode_major": (False, 0.7),
         "bpm": (75, 0.5),
@@ -226,7 +226,7 @@ FEATURE_PROFILES = {
         "mfcc2": (-10.0, 0.2),
     },
     "heartbreak": {
-        "valence": (-0.2, 0.9),
+        "valence": (-0.6, 0.9),
         "arousal": (0.35, 0.5),
         "mode_major": (False, 0.5),
         "energy": (0.12, 0.3),
@@ -234,7 +234,7 @@ FEATURE_PROFILES = {
         "mfcc2": (-8.0, 0.2),
     },
     "depressing": {
-        "valence": (-0.25, 1.0),
+        "valence": (-0.8, 1.0),
         "arousal": (0.15, 0.8),
         "mode_major": (False, 0.7),
         "bpm": (70, 0.5),
@@ -318,7 +318,7 @@ FEATURE_PROFILES = {
         "arousal": (0.75, 0.7),
         "bpm": (125, 0.8),
         "energy": (0.25, 0.7),
-        "valence": (0.1, 0.4),
+        "valence": (0.5, 0.4),
     },
     # ─── NEGATIVE VALENCE + HIGH AROUSAL (Angry/Intense) ───
     "angry": {
@@ -350,6 +350,20 @@ FEATURE_PROFILES = {
         "brightness": (1500, 0.6),
         "arousal": (0.35, 0.5),
         "spectral_rolloff": (3000, 0.4),
+    },
+    "fear": {
+        "arousal": (0.85, 0.9),
+        "energy": (0.25, 0.7),
+        "mode_major": (False, 0.8),
+        "brightness": (1200, 0.5),
+        "spectral_rolloff": (2800, 0.4),
+    },
+    "hate": {
+        "valence": (-0.6, 0.8),
+        "arousal": (0.85, 0.8),
+        "energy": (0.28, 1.0),
+        "mode_major": (False, 0.7),
+        "bpm": (130, 0.6),
     },
     # ─── POSITIVE VALENCE + LOW AROUSAL (Content/Romantic) ───
     "romantic": {
@@ -416,6 +430,8 @@ QUERY_EMOTION_TARGETS = {
     "fear": {"fear": 1.0, "surprise": 0.3},
     "scary": {"fear": 1.0, "surprise": 0.4},
     "horror": {"fear": 1.0, "anger": 0.3},
+    "fear": {"fear": 1.0, "surprise": 0.3},
+    "hate": {"anger": 1.0, "disgust": 0.4},
 }
 
 

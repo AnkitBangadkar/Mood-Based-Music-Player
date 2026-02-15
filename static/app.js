@@ -31,16 +31,40 @@ document.addEventListener("DOMContentLoaded", () => {
     const scanPathInput = document.getElementById("scan-path-input");
     const confirmScanBtn = document.getElementById("confirm-scan-btn");
     const cancelScanBtn = document.getElementById("cancel-scan-btn");
-    const scanStatusEl = document.getElementById("scan-status");
-    const scanProgressEl = document.getElementById("scan-progress");
-    const scanProgressBar = document.getElementById("scan-progress-bar");
-    const scanStageEl = document.getElementById("scan-stage");
-    const scanPercentEl = document.getElementById("scan-percent");
-    const scanCurrentFileEl = document.getElementById("scan-current-file");
-    const scanCountEl = document.getElementById("scan-count");
-    const scanSongsTotalEl = document.getElementById("scan-songs-total");
-    const scanTimerEl = document.getElementById("scan-timer");
-    const scanEtaEl = document.getElementById("scan-eta");
+    
+    // Main page scan progress panel elements
+    const scanProgressPanel = document.getElementById("scan-progress-panel");
+    const scanPanelTitle = document.getElementById("scan-panel-title");
+    const scanPanelStage = document.getElementById("scan-panel-stage");
+    const scanPanelElapsed = document.getElementById("scan-panel-elapsed");
+    const scanPanelEta = document.getElementById("scan-panel-eta");
+    const scanPanelProgressFill = document.getElementById("scan-panel-progress-fill");
+    const scanPanelCurrent = document.getElementById("scan-panel-current");
+    const scanPanelTotal = document.getElementById("scan-panel-total");
+    const scanPanelPercent = document.getElementById("scan-panel-percent");
+    const scanPanelFile = document.getElementById("scan-panel-file");
+    const scanCloseBtn = document.getElementById("scan-close-btn");
+    const scanCompleteActions = document.getElementById("scan-complete-actions");
+    const dismissCompleteBtn = document.getElementById("dismiss-complete-btn");
+    
+    // Library menu elements
+    const libraryBtn = document.getElementById("library-btn");
+    const libraryBtnText = document.getElementById("library-btn-text");
+    const libraryProgress = document.getElementById("library-progress");
+    const libraryDropdown = document.getElementById("library-dropdown");
+    const libraryStats = document.getElementById("library-stats");
+    const libraryLastScan = document.getElementById("library-last-scan");
+    const showProgressBtn = document.getElementById("show-progress-btn");
+    const flushLibraryBtn = document.getElementById("flush-library-btn");
+    
+    // Flush modal elements
+    const flushModal = document.getElementById("flush-modal");
+    const cancelFlushBtn = document.getElementById("cancel-flush-btn");
+    const confirmFlushBtn = document.getElementById("confirm-flush-btn");
+    
+    // State management
+    let isScanMinimized = false;
+    let lastScanStats = JSON.parse(localStorage.getItem('lastScanStats') || '{}');
 
     // --- Audio Player Logic ---
 
@@ -363,23 +387,169 @@ document.addEventListener("DOMContentLoaded", () => {
         lucide.createIcons();
     }
 
+    // --- Library Management ---
+
+    function updateLibraryButton() {
+        // Update library button text based on state
+        const songCount = lastScanStats.songCount || 0;
+        libraryBtnText.innerText = songCount > 0 ? `${songCount} songs` : 'Library';
+        
+        // Update dropdown stats with elapsed time
+        if (songCount > 0) {
+            let statsText = `${songCount} songs indexed`;
+            if (lastScanStats.elapsed) {
+                statsText += ` • ${formatDuration(lastScanStats.elapsed)}`;
+            }
+            libraryStats.innerText = statsText;
+        } else {
+            libraryStats.innerText = 'No songs indexed';
+        }
+        
+        // Update last scan time
+        if (lastScanStats.timestamp) {
+            const date = new Date(lastScanStats.timestamp);
+            libraryLastScan.innerText = 'Last scan: ' + date.toLocaleString();
+        } else {
+            libraryLastScan.innerText = 'Last scan: Never';
+        }
+        
+        lucide.createIcons();
+    }
+
+    function toggleLibraryDropdown() {
+        libraryDropdown.classList.toggle("hidden");
+        lucide.createIcons();
+    }
+
+    function hideLibraryDropdown() {
+        libraryDropdown.classList.add("hidden");
+    }
+
+    libraryBtn.addEventListener("click", () => {
+        if (isScanMinimized) {
+            // Restore progress panel
+            scanProgressPanel.classList.remove("hidden");
+            isScanMinimized = false;
+            libraryProgress.classList.add("hidden");
+        } else {
+            // Toggle dropdown
+            toggleLibraryDropdown();
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener("click", (e) => {
+        if (!libraryBtn.contains(e.target) && !libraryDropdown.contains(e.target)) {
+            hideLibraryDropdown();
+        }
+    });
+
+    showProgressBtn.addEventListener("click", () => {
+        scanProgressPanel.classList.remove("hidden");
+        isScanMinimized = false;
+        libraryProgress.classList.add("hidden");
+        hideLibraryDropdown();
+    });
+
+    // Flush library handlers
+    flushLibraryBtn.addEventListener("click", () => {
+        hideLibraryDropdown();
+        flushModal.classList.remove("hidden");
+        flushModal.classList.add("visible");
+        lucide.createIcons();
+    });
+
+    cancelFlushBtn.addEventListener("click", () => {
+        flushModal.classList.add("hidden");
+        flushModal.classList.remove("visible");
+    });
+
+    confirmFlushBtn.addEventListener("click", async () => {
+        confirmFlushBtn.disabled = true;
+        confirmFlushBtn.innerHTML = '<i data-lucide="loader-2" class="loading"></i> Flushing...';
+        lucide.createIcons();
+
+        try {
+            const res = await fetch("/library/flush", { method: "POST" });
+            if (res.ok) {
+                // Clear local storage
+                lastScanStats = {};
+                localStorage.removeItem('lastScanStats');
+                updateLibraryButton();
+                
+                // Clear song list
+                queue = [];
+                renderSongList();
+                songListEl.innerHTML = '<div class="empty-state"><i data-lucide="music-2"></i><p>Library cleared. Scan to add songs.</p></div>';
+                lucide.createIcons();
+                
+                confirmFlushBtn.innerHTML = '<i data-lucide="check"></i> Flushed!';
+                lucide.createIcons();
+                setTimeout(() => {
+                    flushModal.classList.add("hidden");
+                    flushModal.classList.remove("visible");
+                    confirmFlushBtn.disabled = false;
+                    confirmFlushBtn.innerHTML = '<i data-lucide="trash-2"></i> Yes, Flush Library';
+                    lucide.createIcons();
+                }, 1500);
+            } else {
+                throw new Error('Flush failed');
+            }
+        } catch (err) {
+            confirmFlushBtn.innerHTML = '<i data-lucide="alert-circle"></i> Error';
+            lucide.createIcons();
+            setTimeout(() => {
+                confirmFlushBtn.disabled = false;
+                confirmFlushBtn.innerHTML = '<i data-lucide="trash-2"></i> Yes, Flush Library';
+                lucide.createIcons();
+            }, 2000);
+        }
+    });
+
     // --- Scanning Logic ---
 
-    scanBtn.addEventListener("click", () => {
+    function minimizeScanPanel() {
+        scanProgressPanel.classList.add("hidden");
+        isScanMinimized = true;
+        // Show progress indicator on library button
+        const percent = scanPanelPercent.innerText;
+        if (percent !== '0%') {
+            libraryProgress.innerText = percent;
+            libraryProgress.classList.remove("hidden");
+        }
+    }
+
+    function restoreScanPanel() {
+        scanProgressPanel.classList.remove("hidden");
+        isScanMinimized = false;
+        libraryProgress.classList.add("hidden");
+    }
+
+    scanCloseBtn.addEventListener("click", () => {
+        minimizeScanPanel();
+    });
+
+    dismissCompleteBtn.addEventListener("click", () => {
+        scanProgressPanel.classList.add("hidden");
+        isScanMinimized = false;
+        scanCompleteActions.classList.add("hidden");
+    });
+
+    scanBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        console.log("Scan button clicked");
         scanModal.classList.remove("hidden");
         scanModal.classList.add("visible");
-        scanProgressEl.classList.add("hidden");
-        scanProgressBar.style.width = '0%';
-        // Poll status immediately to see if one is running
-        checkScanStatus();
+        scanPathInput.focus();
     });
+    
+    // Debug: ensure elements exist
+    console.log("Scan button:", scanBtn);
+    console.log("Scan modal:", scanModal);
 
     cancelScanBtn.addEventListener("click", () => {
         scanModal.classList.add("hidden");
         scanModal.classList.remove("visible");
-        scanProgressEl.classList.add("hidden");
-        scanProgressBar.style.width = '0%';
-        if (scanInterval) clearInterval(scanInterval);
     });
 
     confirmScanBtn.addEventListener("click", async () => {
@@ -387,7 +557,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!path) return;
 
         confirmScanBtn.disabled = true;
-        scanStatusEl.innerText = "Starting scan...";
+        confirmScanBtn.innerHTML = '<i data-lucide="loader-2" class="loading"></i> Starting...';
+        lucide.createIcons();
 
         try {
             const res = await fetch("/scan", {
@@ -401,27 +572,55 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             
             if (res.ok) {
+                // Close modal and show progress on main page
+                scanModal.classList.add("hidden");
+                scanModal.classList.remove("visible");
+                scanProgressPanel.classList.remove("hidden");
+                isScanMinimized = false;
+                scanPathInput.value = ''; // Clear input
+                libraryProgress.classList.add("hidden");
                 startPollingScan();
             } else {
                 const err = await res.json();
-                scanStatusEl.innerText = "Error: " + err.detail;
-                confirmScanBtn.disabled = false;
+                confirmScanBtn.innerHTML = '<i data-lucide="alert-circle"></i> Error';
+                lucide.createIcons();
+                setTimeout(() => {
+                    confirmScanBtn.disabled = false;
+                    confirmScanBtn.innerHTML = '<i data-lucide="search"></i> Start Scan';
+                    lucide.createIcons();
+                }, 2000);
             }
         } catch (err) {
-            scanStatusEl.innerText = "Network Error";
-            confirmScanBtn.disabled = false;
+            confirmScanBtn.innerHTML = '<i data-lucide="alert-circle"></i> Network Error';
+            lucide.createIcons();
+            setTimeout(() => {
+                confirmScanBtn.disabled = false;
+                confirmScanBtn.innerHTML = '<i data-lucide="search"></i> Start Scan';
+                lucide.createIcons();
+            }, 2000);
+        }
+    });
+
+    // Allow Enter key to start scan
+    scanPathInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            confirmScanBtn.click();
         }
     });
 
     function startPollingScan() {
         if (scanInterval) clearInterval(scanInterval);
-        scanInterval = setInterval(checkScanStatus, 2000);
+        scanInterval = setInterval(checkScanStatus, 1000);
     }
 
-    function formatTime(seconds) {
-        if (!seconds) return '--:--';
-        const mins = Math.floor(seconds / 60);
+    function formatDuration(seconds) {
+        if (!seconds || seconds < 0) return '--:--';
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
         const secs = Math.floor(seconds % 60);
+        if (hours > 0) {
+            return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
@@ -430,72 +629,100 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/scan/status");
             const status = await res.json();
             
-            // Show/hide progress section
-            if (status.is_scanning || status.stage !== 'idle') {
-                scanProgressEl.classList.remove("hidden");
+            // Show panel if not minimized and scan is active
+            if ((status.is_scanning || status.stage !== 'idle') && !isScanMinimized) {
+                scanProgressPanel.classList.remove("hidden");
             }
             
-            // Update stage
-            const stageNames = {
-                'scanning': 'Scanning files...',
-                'embedding': 'Building embeddings...',
-                'clap': 'Computing CLAP embeddings...',
-                'complete': 'Complete!',
-                'idle': 'Ready'
+            // Update stage with icon
+            const stageConfig = {
+                'scanning': { text: 'Scanning files', icon: 'folder-search' },
+                'embedding': { text: 'Building embeddings', icon: 'brain' },
+                'clap': { text: 'Computing audio features', icon: 'music' },
+                'complete': { text: 'Scan complete!', icon: 'check-circle' },
+                'idle': { text: 'Ready', icon: 'check' }
             };
-            scanStageEl.innerText = stageNames[status.stage] || status.stage;
-            scanStageEl.className = 'stage-' + status.stage;
+            const stageInfo = stageConfig[status.stage] || { text: status.stage, icon: 'loader' };
+            scanPanelStage.innerHTML = `<i data-lucide="${stageInfo.icon}"></i> ${stageInfo.text}`;
             
             // Update progress bar
             const percent = status.total > 0 ? Math.round((status.current / status.total) * 100) : 0;
-            scanProgressBar.style.width = percent + '%';
-            scanPercentEl.innerText = percent + '%';
+            scanPanelProgressFill.style.width = percent + '%';
+            scanPanelPercent.innerText = percent + '%';
+            scanPanelPercent.className = 'scan-percent' + (percent >= 100 ? ' complete' : '');
+            
+            // Update minimized progress indicator
+            if (isScanMinimized && percent > 0) {
+                libraryProgress.innerText = percent + '%';
+                libraryProgress.classList.remove("hidden");
+            }
             
             // Update current file
-            scanCurrentFileEl.innerText = status.current_file || '';
+            scanPanelFile.innerText = status.current_file || '';
             
-            // Update counts - show "new" vs "existing"
-            const newFiles = status.current;
-            const totalFiles = status.total;
-            const existing = status.existing_songs || 0;
-            scanCountEl.innerText = `${newFiles} / ${totalFiles} new files`;
-            scanSongsTotalEl.innerText = `Total indexed: ${status.indexed_songs} (${existing} existing + ${newFiles} new)`;
+            // Update counts
+            scanPanelCurrent.innerText = `${status.current} / ${status.total} files`;
+            scanPanelTotal.innerText = `${status.indexed_songs} songs indexed`;
             
             // Update timer and ETA
-            if (status.elapsed_seconds !== undefined && status.elapsed_seconds !== null) {
-                scanTimerEl.innerText = `${formatTime(status.elapsed_seconds)} elapsed`;
-            } else {
-                scanTimerEl.innerText = '--:-- elapsed';
-            }
+            scanPanelElapsed.innerText = formatDuration(status.elapsed_seconds) + ' elapsed';
             
             if (status.eta_seconds !== undefined && status.eta_seconds !== null && status.is_scanning) {
-                scanEtaEl.innerText = `ETA: ${formatTime(status.eta_seconds)}`;
+                scanPanelEta.innerText = 'ETA: ' + formatDuration(status.eta_seconds);
+                scanPanelEta.className = 'scan-eta';
+                scanPanelTitle.innerText = 'Scanning Library';
+                scanCompleteActions.classList.add("hidden");
             } else if (!status.is_scanning && status.stage === 'complete') {
-                scanEtaEl.innerText = `Total time: ${formatTime(status.elapsed_seconds)}`;
-            } else if (status.is_scanning && newFiles > 0) {
-                scanEtaEl.innerText = 'ETA: calculating...';
+                scanPanelEta.innerText = 'Done in ' + formatDuration(status.elapsed_seconds);
+                scanPanelEta.className = 'scan-eta complete';
+                scanPanelTitle.innerText = 'Scan Complete!';
+                scanCompleteActions.classList.remove("hidden");
+                
+                // Save scan stats
+                lastScanStats = {
+                    songCount: status.indexed_songs,
+                    elapsed: status.elapsed_seconds,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('lastScanStats', JSON.stringify(lastScanStats));
+                updateLibraryButton();
+                
+                // Auto-minimize after 3 seconds
+                setTimeout(() => {
+                    if (!isScanMinimized && status.stage === 'complete') {
+                        minimizeScanPanel();
+                    }
+                }, 3000);
+            } else if (status.is_scanning && status.current > 0) {
+                scanPanelEta.innerText = 'ETA: calculating...';
+                scanPanelEta.className = 'scan-eta';
+                scanPanelTitle.innerText = 'Scanning Library';
+                scanCompleteActions.classList.add("hidden");
             } else {
-                scanEtaEl.innerText = 'ETA: --:--';
+                scanPanelEta.innerText = 'ETA: --:--';
+                scanPanelEta.className = 'scan-eta';
+                scanCompleteActions.classList.add("hidden");
             }
             
-            // Show basic status for compatibility
-            if (status.is_scanning) {
-                scanStatusEl.innerText = `Processing: ${status.current_file}`;
-                confirmScanBtn.disabled = true;
-            } else {
+            lucide.createIcons();
+            
+            if (!status.is_scanning) {
                 if (scanInterval) {
                     clearInterval(scanInterval);
                     scanInterval = null;
                 }
-                scanStatusEl.innerText = `Scan Complete! Total songs: ${status.indexed_songs}`;
-                scanProgressBar.style.width = '100%';
-                scanPercentEl.innerText = '100%';
                 confirmScanBtn.disabled = false;
             }
         } catch (err) {
             console.error("Poll error", err);
         }
     }
+
+    // Initialize library button state
+    updateLibraryButton();
+    
+    // Check for existing scan on page load
+    checkScanStatus();
 
     // --- Helpers ---
 

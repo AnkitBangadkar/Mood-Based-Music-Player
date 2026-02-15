@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
@@ -70,6 +70,38 @@ class SongResponse(BaseModel):
 class PlaylistSaveRequest(BaseModel):
     name: str
     song_ids: List[int]
+
+
+def _format_song_response(
+    song: dict, score: Optional[float] = None, include_duration: bool = False
+) -> dict:
+    """Helper to format song response consistently across endpoints."""
+    response = {
+        "id": song["id"],
+        "title": song["title"] or "Unknown",
+        "artist": song["artist"] or "Unknown",
+        "album": song["album"] or "Unknown",
+        "genre": song["genre"] or "",
+        "filepath": song["filepath"],
+        "bpm": song["bpm"],
+        "energy": song["energy"],
+        "valence": song["valence"],
+        "arousal": song.get("arousal"),
+        "has_lyrics": bool(song["has_lyrics"]),
+        "score": float(score) if score is not None else None,
+    }
+
+    if include_duration:
+        duration = 0
+        try:
+            audio = mutagen.File(song["filepath"])
+            if audio:
+                duration = getattr(audio.info, "length", 0)
+        except Exception:
+            pass
+        response["duration"] = duration
+
+    return response
 
 
 # Serve static files
@@ -216,37 +248,14 @@ def get_scan_status():
 
 @app.post("/generate", response_model=List[SongResponse])
 def generate_playlist(request: GenerateRequest):
-    results = engine.get_engine().search(request.prompt, limit=request.limit or 20)
+    results = engine.search(request.prompt, limit=request.limit or 20)
 
     response = []
     for song_id, score in results:
         song = database.get_song_by_id(song_id)
         if song:
-            # Get duration from mutagen
-            duration = 0
-            try:
-                audio = mutagen.File(song["filepath"])
-                if audio:
-                    duration = getattr(audio.info, "length", 0)
-            except:
-                pass
-
             response.append(
-                {
-                    "id": song["id"],
-                    "title": song["title"] or "Unknown",
-                    "artist": song["artist"] or "Unknown",
-                    "album": song["album"] or "Unknown",
-                    "genre": song["genre"] or "",
-                    "filepath": song["filepath"],
-                    "bpm": song["bpm"],
-                    "energy": song["energy"],
-                    "valence": song["valence"],
-                    "arousal": song["arousal"],
-                    "duration": duration,
-                    "has_lyrics": bool(song["has_lyrics"]),
-                    "score": float(score),
-                }
+                _format_song_response(song, score=score, include_duration=True)
             )
 
     return response
@@ -257,21 +266,7 @@ def get_songs(limit: int = 500):
     all_songs = database.get_all_songs()
     result = []
     for s in all_songs[:limit]:
-        result.append(
-            {
-                "id": s["id"],
-                "title": s["title"] or "Unknown",
-                "artist": s["artist"] or "Unknown",
-                "album": s["album"] or "Unknown",
-                "genre": s["genre"] or "",
-                "filepath": s["filepath"],
-                "bpm": s["bpm"],
-                "energy": s["energy"],
-                "valence": s["valence"],
-                "has_lyrics": bool(s["has_lyrics"]),
-                "score": None,
-            }
-        )
+        result.append(_format_song_response(s, score=None, include_duration=False))
     return result
 
 
@@ -281,18 +276,7 @@ def get_song(song_id: int):
     song = database.get_song_by_id(song_id)
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
-    return {
-        "id": song["id"],
-        "title": song["title"] or "Unknown",
-        "artist": song["artist"] or "Unknown",
-        "album": song["album"] or "Unknown",
-        "genre": song["genre"] or "",
-        "filepath": song["filepath"],
-        "bpm": song["bpm"],
-        "energy": song["energy"],
-        "valence": song["valence"],
-        "has_lyrics": bool(song["has_lyrics"]),
-    }
+    return _format_song_response(song, score=None, include_duration=False)
 
 
 @app.get("/audio/{song_id}")
@@ -388,6 +372,25 @@ def get_lyrics(song_id: int):
         return {"has_lyrics": True, "lyrics": lyrics_file.read_text(encoding="utf-8")}
 
     return {"has_lyrics": False, "lyrics": None}
+
+
+@app.post("/library/flush")
+def flush_library():
+    """Clear all songs from the library and reset the index."""
+    try:
+        # Clear database
+        database.clear_library()
+
+        # Reset engine index
+        eng = engine.get_engine()
+        if hasattr(eng, "embeddings"):
+            eng.embeddings = None
+        if hasattr(eng, "ids"):
+            eng.ids = None
+
+        return {"status": "success", "message": "Library cleared"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

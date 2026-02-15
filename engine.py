@@ -131,6 +131,11 @@ class VectorEngine:
         return cls._instance
 
 
+def get_engine():
+    """Module-level convenience function to get the singleton engine instance."""
+    return VectorEngine.get_engine()
+
+
 # ──────────────────────────────────────────────────────────────────────
 # PIPELINE STEPS
 # ──────────────────────────────────────────────────────────────────────
@@ -253,15 +258,15 @@ def compute_feature_score(song, profile):
     if not profile:
         return 0.0
 
-    bpm = song.get("bpm", 0) or 0
-    energy = song.get("energy", 0) or 0
-    valence = song.get("valence", 0) or 0
-    arousal = song.get("arousal", 0.5) or 0.5
-    mode = song.get("mode", "") or ""
-    brightness = song.get("brightness", 0) or 0
-    dynamic_range = song.get("dynamic_range", 0) or 0
-    spectral_rolloff = song.get("spectral_rolloff", 0) or 0
-    spectral_bandwidth = song.get("spectral_bandwidth", 0) or 0
+    bpm = song.get("bpm") or 0
+    energy = song.get("energy") or 0
+    valence = song.get("valence") or 0
+    arousal = song.get("arousal") or 0.5
+    mode = song.get("mode") or ""
+    brightness = song.get("brightness") or 0
+    dynamic_range = song.get("dynamic_range") or 0
+    spectral_rolloff = song.get("spectral_rolloff") or 0
+    spectral_bandwidth = song.get("spectral_bandwidth") or 0
 
     total_score = 0.0
     total_weight = 0.0
@@ -427,11 +432,14 @@ def search(query, limit=20):
         f"Weights: Sem={w_sem:.2f}, Feat={w_feat:.2f}, Genre={w_genre:.2f}, Emotion={w_emotion:.2f}"
     )
 
-    # ─── STEP 5: Normalize semantic scores ───
+    # ─── STEP 5: Normalize semantic scores - preserve relative spread ───
+    # Use percentile-based normalization to preserve score differentiation
     sim_min = float(np.min(raw_similarities))
     sim_max = float(np.max(raw_similarities))
     sim_range = max(sim_max - sim_min, SCORE_NORMALIZATION_FLOOR)
-    norm_semantic = np.clip((raw_similarities - sim_min) / sim_range, 0.0, 1.0)
+
+    # Simple min-max normalization that preserves relative distances
+    norm_semantic = (raw_similarities - sim_min) / sim_range
 
     # ─── STEP 6: Compute per-song scores ───
     feature_scores = np.zeros(len(engine.ids))
@@ -468,15 +476,21 @@ def search(query, limit=20):
         - negation_penalties
     )
 
-    # ─── STEP 8: Get top results ───
+    # ─── STEP 8: Scale final scores to 0-100 range without re-normalizing ───
+    # The scores are already weighted combinations - just scale them
+    # Use raw max to determine scale factor
+    final_max = float(np.max(final_scores))
+    if final_max > 0.01:
+        # Scale to 0-100 while preserving absolute differences
+        final_scores = (final_scores / final_max) * 100
+
+    # ─── STEP 9: Get top results ───
     top_indices = np.argsort(final_scores)[::-1][:limit]
 
     results = []
     for idx in top_indices:
         song_id = engine.ids[idx]
         score = float(final_scores[idx])
-
-        if score > 0:
-            results.append((song_id, score))
+        results.append((song_id, score))
 
     return results

@@ -22,11 +22,69 @@
                 <i data-lucide="folder-search"></i>
                 Scan Library
             </button>
+            <div class="library-menu-container">
+                <button class="secondary library-btn" id="library-btn">
+                    <i data-lucide="library"></i>
+                    <span id="library-btn-text">Library</span>
+                    <span id="library-progress" class="library-progress hidden"></span>
+                </button>
+                <div id="library-dropdown" class="library-dropdown hidden">
+                    <div class="library-dropdown-header">
+                        <span id="library-stats">0 songs indexed</span>
+                        <span id="library-last-scan">Last scan: --</span>
+                    </div>
+                    <div class="library-dropdown-actions">
+                        <button class="dropdown-item" id="show-progress-btn">
+                            <i data-lucide="eye"></i>
+                            Show Progress
+                        </button>
+                        <button class="dropdown-item danger" id="flush-library-btn">
+                            <i data-lucide="trash-2"></i>
+                            Flush Library
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 
     <!-- Main Content -->
     <main>
+        <!-- Scan Progress Panel (appears when scanning) -->
+        <section id="scan-progress-panel" class="scan-progress-panel hidden">
+            <div class="scan-progress-header">
+                <div class="scan-status-info">
+                    <i data-lucide="folder-search"></i>
+                    <span class="scan-title" id="scan-panel-title">Scanning Library</span>
+                    <span id="scan-panel-stage" class="scan-stage">Preparing...</span>
+                </div>
+                <div class="scan-progress-actions">
+                    <div class="scan-time-info">
+                        <span id="scan-panel-elapsed">00:00 elapsed</span>
+                        <span id="scan-panel-eta" class="scan-eta">ETA: --:--</span>
+                    </div>
+                    <button class="scan-close-btn" id="scan-close-btn" title="Minimize to header">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="scan-progress-bar-container">
+                <div id="scan-panel-progress-fill" class="scan-progress-bar-fill" style="width: 0%"></div>
+            </div>
+            <div class="scan-progress-details">
+                <span id="scan-panel-current">0 / 0 files</span>
+                <span id="scan-panel-total">Total: 0 songs</span>
+                <span id="scan-panel-percent" class="scan-percent">0%</span>
+            </div>
+            <div id="scan-panel-file" class="scan-current-file"></div>
+            <div id="scan-complete-actions" class="scan-complete-actions hidden">
+                <button class="secondary" id="dismiss-complete-btn">
+                    <i data-lucide="check"></i>
+                    Dismiss
+                </button>
+            </div>
+        </section>
+
         <!-- Generator Panel -->
         <section class="generator-panel">
             <input type="text" id="prompt-input" placeholder="Describe a mood (e.g., 'Sad songs for a rainy day')..." autocomplete="off">
@@ -105,29 +163,9 @@
     <!-- Scan Modal -->
     <div id="scan-modal" class="modal-overlay hidden">
         <div class="modal-content scan-modal">
-            <h2>Scan Library</h2>
-            <p>Enter the absolute path to your music folder.</p>
+            <h2><i data-lucide="folder-search"></i> Scan Library</h2>
+            <p>Enter the absolute path to your music folder to index your collection.</p>
             <input type="text" id="scan-path-input" placeholder="/home/user/Music">
-            
-            <!-- Progress Section -->
-            <div id="scan-progress" class="scan-progress hidden">
-                <div class="progress-header">
-                    <span class="stage" id="scan-stage">Preparing...</span>
-                    <span class="percent" id="scan-percent">0%</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div id="scan-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
-                </div>
-                <div id="scan-current-file" class="scan-current-file"></div>
-                <div class="progress-stats">
-                    <span id="scan-count">0 / 0 files</span>
-                    <span id="scan-timer">--:-- elapsed</span>
-                </div>
-                <div class="progress-stats">
-                    <span id="scan-songs-total">Total indexed: 0</span>
-                    <span id="scan-eta">ETA: --:--</span>
-                </div>
-            </div>
             
             <div class="modal-buttons">
                 <button class="secondary" id="cancel-scan-btn">
@@ -139,7 +177,26 @@
                     Start Scan
                 </button>
             </div>
-            <div id="scan-status"></div>
+        </div>
+    </div>
+
+    <!-- Flush Library Confirmation Modal -->
+    <div id="flush-modal" class="modal-overlay hidden">
+        <div class="modal-content flush-modal">
+            <h2><i data-lucide="alert-triangle"></i> Flush Library</h2>
+            <p>Are you sure you want to delete all songs from the library? This action cannot be undone.</p>
+            <p class="flush-warning">All indexed songs, embeddings, and metadata will be permanently removed.</p>
+            
+            <div class="modal-buttons">
+                <button class="secondary" id="cancel-flush-btn">
+                    <i data-lucide="x"></i>
+                    Cancel
+                </button>
+                <button class="danger" id="confirm-flush-btn">
+                    <i data-lucide="trash-2"></i>
+                    Yes, Flush Library
+                </button>
+            </div>
         </div>
     </div>
 

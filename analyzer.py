@@ -15,9 +15,33 @@ import numpy as np
 import os
 import warnings
 from logger import get_logger
-
-# Suppress warnings from librosa for cleaner logs
-warnings.filterwarnings("ignore")
+from constants import (
+    KEY_CONFIDENCE_THRESHOLD,
+    TUNING_ESTIMATION_ENABLED,
+    TUNING_CONFIDENCE_THRESHOLD,
+    BPM_HIGH_THRESHOLD,
+    BPM_LOW_THRESHOLD,
+    ENERGY_OCTAVE_THRESHOLD,
+    VALENCE_MODE_MAX_WEIGHT,
+    VALENCE_TEMPO_REFERENCE,
+    VALENCE_TEMPO_RANGE,
+    VALENCE_TEMPO_WEIGHT,
+    VALENCE_BRIGHTNESS_REFERENCE,
+    VALENCE_BRIGHTNESS_RANGE,
+    VALENCE_BRIGHTNESS_WEIGHT,
+    VALENCE_CONTRAST_REFERENCE,
+    VALENCE_CONTRAST_RANGE,
+    VALENCE_CONTRAST_WEIGHT,
+    VALENCE_ZCR_PENALTY_THRESHOLD,
+    VALENCE_ZCR_PENALTY,
+    AROUSAL_BPM_REFERENCE,
+    AROUSAL_BPM_RANGE,
+    AROUSAL_BPM_MIN_CLIP,
+    AROUSAL_BPM_MAX_CLIP,
+    AROUSAL_ENERGY_MIN,
+    AROUSAL_ENERGY_RANGE,
+    AROUSAL_ENERGY_WEIGHT,
+)
 
 log = get_logger("Analyzer")
 
@@ -51,11 +75,13 @@ def analyze_track(filepath, duration=90, offset=15):
         dict with audio features and mood descriptors.
     """
     try:
-        # Load audio as mono
-        y, sr = librosa.load(
-            filepath, sr=22050, mono=True, offset=offset, duration=duration
-        )
-    except Exception as e:
+        # Load audio as mono - suppress only librosa UserWarnings about resampling
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            y, sr = librosa.load(
+                filepath, sr=22050, mono=True, offset=offset, duration=duration
+            )
+    except (IOError, OSError) as e:
         log.error(f"Failed to load audio {filepath}: {e}")
         return None
 
@@ -70,9 +96,12 @@ def analyze_track(filepath, duration=90, offset=15):
 
     # 1. Tempo (BPM) - Single pass (multi-seg removed: 2.5x slower, no accuracy gain)
     try:
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         bpm = float(tempo) if not isinstance(tempo, np.ndarray) else float(tempo[0])
-    except Exception:
+    except (RuntimeError, ValueError) as e:
+        log.warning(f"Beat tracking failed: {e}")
         bpm = 0.0
 
     # 2. Energy (RMS)
@@ -80,10 +109,10 @@ def analyze_track(filepath, duration=90, offset=15):
     energy = float(np.mean(rms))
 
     # 2b. BPM octave correction using energy as sanity check
-    # Threshold raised from 0.18 to 0.22 to fix death bed (energy=0.2035, BPM 143.6->71.8)
-    if bpm > 140 and energy < 0.22:
+    # Uses ENERGY_OCTAVE_THRESHOLD to fix misdetected high BPM on low-energy tracks
+    if bpm > BPM_HIGH_THRESHOLD and energy < ENERGY_OCTAVE_THRESHOLD:
         bpm /= 2
-    elif bpm < 55:
+    elif bpm < BPM_LOW_THRESHOLD:
         bpm *= 2
 
     # 3. Spectral Centroid (Brightness)
@@ -175,13 +204,39 @@ def detect_key(y, sr):
     This correlates the chroma distribution with theoretical major/minor
     key profiles derived from music cognition research.
 
+    Includes tuning estimation to handle non-A440 recordings (e.g., 432Hz).
+
     Returns:
         tuple: (key_name, mode, confidence)
         e.g., ('C', 'major', 0.85)
     """
+    # Estimate tuning deviation from A440
+    tuning_deviation = 0.0
+    if TUNING_ESTIMATION_ENABLED:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                tuning_deviation = librosa.estimate_tuning(y=y, sr=sr)
+            # tuning_deviation is in fractions of a bin (+-0.5 = +-50 cents)
+            tuning_confidence = 1.0 - abs(tuning_deviation) / 0.5
+        except (RuntimeError, ValueError):
+            tuning_confidence = 0.0
+            tuning_deviation = 0.0
+    else:
+        tuning_confidence = 0.0
+
     # Compute chromagram (12 pitch classes) using STFT for speed
-    # (CQT is more precise but significantly slower)
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+    # Apply tuning correction if confidence is high enough
+    if (
+        tuning_confidence >= TUNING_CONFIDENCE_THRESHOLD
+        and abs(tuning_deviation) > 0.05
+    ):
+        # Use CQT with tuning correction for better accuracy on detuned tracks
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, tuning=tuning_deviation)
+    else:
+        # Standard STFT chromagram for speed on properly tuned tracks
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+
     chroma_mean = np.mean(chroma, axis=1)
 
     # Normalize
@@ -218,6 +273,11 @@ def detect_key(y, sr):
     key_name = PITCH_CLASSES[best_key]
     confidence = max(0, min(1, best_corr))  # Clamp to 0-1
 
+    # If confidence is too low, mark as unknown
+    if confidence < 0.3:
+        key_name = "unknown"
+        best_mode = "unknown"
+
     return key_name, best_mode, confidence
 
 
@@ -241,10 +301,14 @@ def estimate_valence(bpm, energy, brightness, mode, contrast, zcr, key_confidenc
     valence = 0.0
 
     # Mode contribution: GATED by confidence threshold
-    # Below 0.65 confidence, mode detection is unreliable — treat as neutral
-    # Above 0.65, scale linearly: 0.65→0, 1.0→0.3
-    if key_confidence >= 0.65:
-        mode_weight = 0.3 * (key_confidence - 0.65) / 0.35
+    # Below KEY_CONFIDENCE_THRESHOLD, mode detection is unreliable — treat as neutral
+    # Above threshold, scale linearly to VALENCE_MODE_MAX_WEIGHT
+    if key_confidence >= KEY_CONFIDENCE_THRESHOLD:
+        mode_weight = (
+            VALENCE_MODE_MAX_WEIGHT
+            * (key_confidence - KEY_CONFIDENCE_THRESHOLD)
+            / (1.0 - KEY_CONFIDENCE_THRESHOLD)
+        )
     else:
         mode_weight = 0.0
 
@@ -253,23 +317,37 @@ def estimate_valence(bpm, energy, brightness, mode, contrast, zcr, key_confidenc
     else:  # minor
         valence -= mode_weight
 
-    # Tempo contribution (normalized around 120 BPM)
+    # Tempo contribution (normalized around reference BPM)
     if bpm > 0:
-        tempo_factor = (bpm - 100) / 80  # Maps 60-180 to roughly -0.5 to +1
-        valence += np.clip(tempo_factor * 0.2, -0.2, 0.2)
+        tempo_factor = (bpm - VALENCE_TEMPO_REFERENCE) / VALENCE_TEMPO_RANGE
+        valence += np.clip(
+            tempo_factor * VALENCE_TEMPO_WEIGHT,
+            -VALENCE_TEMPO_WEIGHT,
+            VALENCE_TEMPO_WEIGHT,
+        )
 
     # Brightness contribution
     if brightness > 0:
-        bright_factor = (brightness - 2000) / 2000  # Maps 1000-4000 to -0.5 to +1
-        valence += np.clip(bright_factor * 0.15, -0.15, 0.15)
+        bright_factor = (
+            brightness - VALENCE_BRIGHTNESS_REFERENCE
+        ) / VALENCE_BRIGHTNESS_RANGE
+        valence += np.clip(
+            bright_factor * VALENCE_BRIGHTNESS_WEIGHT,
+            -VALENCE_BRIGHTNESS_WEIGHT,
+            VALENCE_BRIGHTNESS_WEIGHT,
+        )
 
     # Spectral contrast (dynamic music tends to be more positive)
-    contrast_factor = (contrast - 20) / 20
-    valence += np.clip(contrast_factor * 0.1, -0.1, 0.1)
+    contrast_factor = (contrast - VALENCE_CONTRAST_REFERENCE) / VALENCE_CONTRAST_RANGE
+    valence += np.clip(
+        contrast_factor * VALENCE_CONTRAST_WEIGHT,
+        -VALENCE_CONTRAST_WEIGHT,
+        VALENCE_CONTRAST_WEIGHT,
+    )
 
     # High zero-crossing can indicate harshness (negative) or percussion (neutral)
-    if zcr > 0.15:
-        valence -= 0.05  # Slight penalty for very harsh/noisy
+    if zcr > VALENCE_ZCR_PENALTY_THRESHOLD:
+        valence -= VALENCE_ZCR_PENALTY  # Slight penalty for very harsh/noisy
 
     return np.clip(valence, -1, 1)
 
@@ -287,14 +365,20 @@ def estimate_arousal(bpm, energy):
     """
     arousal = 0.0
 
-    # BPM contribution: 80 BPM → 0 (calm baseline), 240 BPM → 0.5
-    # Allow negative drag for very slow songs (55 BPM) to pull arousal down
+    # BPM contribution: reference BPM → 0 (calm baseline)
+    # Allow negative drag for very slow songs to pull arousal down
     if bpm > 0:
-        arousal += np.clip((bpm - 80) / 160, -0.2, 0.5)
+        arousal += np.clip(
+            (bpm - AROUSAL_BPM_REFERENCE) / AROUSAL_BPM_RANGE,
+            AROUSAL_BPM_MIN_CLIP,
+            AROUSAL_BPM_MAX_CLIP,
+        )
 
     # Energy (RMS) contribution: linear map across actual range
-    # 0.05 → 0, 0.40 → 0.3 (actual range is 0.054-0.386)
-    arousal += np.clip((energy - 0.05) / 0.35, 0, 1) * 0.3
+    arousal += (
+        np.clip((energy - AROUSAL_ENERGY_MIN) / AROUSAL_ENERGY_RANGE, 0, 1)
+        * AROUSAL_ENERGY_WEIGHT
+    )
 
     return np.clip(arousal, 0, 1)
 

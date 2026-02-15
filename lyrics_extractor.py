@@ -2,10 +2,11 @@
 Lyrics Extractor with Caching.
 Fetched lyrics are stored in a central cache folder to avoid re-fetching.
 """
+
 import os
 import hashlib
 import mutagen
-from mutagen.id3 import ID3, USLT
+from mutagen.id3 import ID3
 from mutagen.flac import FLAC
 from mutagen.mp4 import MP4
 from logger import get_logger
@@ -19,12 +20,16 @@ def _get_cache_path(filepath, title, artist):
     """Generate a unique cache file path for a song."""
     # Create a unique hash based on filepath (handles duplicates)
     unique_key = f"{filepath}|{title}|{artist}"
-    hash_name = hashlib.md5(unique_key.encode('utf-8')).hexdigest()[:16]
-    
+    hash_name = hashlib.md5(unique_key.encode("utf-8")).hexdigest()[:16]
+
     # Clean filename for cache
-    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in (title or "unknown")[:50])
-    safe_artist = "".join(c if c.isalnum() or c in " -_" else "_" for c in (artist or "unknown")[:30])
-    
+    safe_title = "".join(
+        c if c.isalnum() or c in " -_" else "_" for c in (title or "unknown")[:50]
+    )
+    safe_artist = "".join(
+        c if c.isalnum() or c in " -_" else "_" for c in (artist or "unknown")[:30]
+    )
+
     cache_filename = f"{safe_artist} - {safe_title} [{hash_name}].txt"
     return os.path.join(config.LYRICS_CACHE_DIR, cache_filename)
 
@@ -40,7 +45,7 @@ def _get_cached_lyrics(cache_path):
     """Try to load lyrics from cache."""
     if os.path.exists(cache_path):
         try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
+            with open(cache_path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
                 if content:
                     return content
@@ -53,7 +58,7 @@ def _save_to_cache(cache_path, lyrics):
     """Save lyrics to cache file."""
     try:
         _ensure_cache_dir()
-        with open(cache_path, 'w', encoding='utf-8') as f:
+        with open(cache_path, "w", encoding="utf-8") as f:
             f.write(lyrics)
     except Exception as e:
         log.warning(f"Failed to save cache {cache_path}: {e}")
@@ -67,21 +72,21 @@ def get_lyrics(filepath, title=None, artist=None, allow_online=False):
     2. Lyrics Cache (previously fetched online lyrics)
     3. Embedded Tags (ID3 USLT, FLAC LYRICS)
     4. Online Fetch (Genius/OVH) - ONLY if allow_online=True
-    
+
     Returns:
         str: Lyrics text or None if not found.
     """
     cache_path = _get_cache_path(filepath, title, artist)
-    
+
     # 1. Check for Sidecar Files (user-provided local files)
     base_path = os.path.splitext(filepath)[0]
-    for ext in ['.lrc', '.txt']:
+    for ext in [".lrc", ".txt"]:
         sidecar = base_path + ext
         if os.path.exists(sidecar):
             try:
-                with open(sidecar, 'r', encoding='utf-8') as f:
+                with open(sidecar, "r", encoding="utf-8") as f:
                     content = f.read()
-                    if ext == '.lrc':
+                    if ext == ".lrc":
                         return _clean_lrc(content)
                     return content
             except Exception as e:
@@ -96,13 +101,13 @@ def get_lyrics(filepath, title=None, artist=None, allow_online=False):
     try:
         file_ext = os.path.splitext(filepath)[1].lower()
         content = None
-        if file_ext == '.mp3':
+        if file_ext == ".mp3":
             content = _get_mp3_lyrics(filepath)
-        elif file_ext == '.flac':
+        elif file_ext == ".flac":
             content = _get_flac_lyrics(filepath)
-        elif file_ext == '.m4a':
+        elif file_ext == ".m4a":
             content = _get_m4a_lyrics(filepath)
-            
+
         if content:
             # Cache embedded lyrics too for consistency
             _save_to_cache(cache_path, content)
@@ -122,19 +127,72 @@ def get_lyrics(filepath, title=None, artist=None, allow_online=False):
     return None
 
 
-def _clean_lrc(content):
-    """Removes timestamps like [00:12.34] from LRC content."""
-    import re
-    lines = [line for line in content.splitlines() 
-             if not line.strip().startswith('[ar:') 
-             and not line.strip().startswith('[ti:')]
-    
-    clean_lines = []
+import re
+
+
+def clean_lyrics_text(lyrics_text):
+    """
+    Clean raw lyrics by stripping section headers, timestamps,
+    translations, and transliterations before analysis.
+    This is the comprehensive version used across the application.
+    """
+    if not lyrics_text:
+        return ""
+
+    lines = lyrics_text.split("\n")
+    cleaned = []
+
     for line in lines:
-        text = re.sub(r'\[\d{2}:\d{2}\.\d{2,3}\]', '', line).strip()
-        if text:
-            clean_lines.append(text)
-    return "\n".join(clean_lines)
+        stripped = line.strip()
+
+        # Skip empty lines
+        if not stripped:
+            continue
+
+        # Skip section headers like [Verse 1], [Chorus], [Hook], [Bridge], etc.
+        if re.match(
+            r"^\[(?:Verse|Chorus|Hook|Bridge|Intro|Outro|Pre-Chorus|Refrain|Interlude|Instrumental|Solo|Break|Skit|Spoken|Ad[- ]?lib)\s*\d*\]$",
+            stripped,
+            re.IGNORECASE,
+        ):
+            continue
+
+        # Skip LRC timestamps like [00:32.14]
+        stripped = re.sub(r"\[\d{1,2}:\d{2}(?:\.\d{2,3})?\]", "", stripped).strip()
+
+        # Skip metadata lines like [ar:Artist], [ti:Title], etc.
+        if re.match(r"^\[(?:ar|ti|al|by|offset):", stripped, re.IGNORECASE):
+            continue
+
+        # Skip translation markers
+        if re.match(
+            r"^\((?:Translation|Romanization|Romaji|English|Japanese)\s*:?\s*\)",
+            stripped,
+            re.IGNORECASE,
+        ):
+            continue
+
+        # Skip lines that are just credits or metadata
+        if re.match(
+            r"^(?:Written by|Produced by|Lyrics by|Composed by|Music by)",
+            stripped,
+            re.IGNORECASE,
+        ):
+            continue
+
+        # Skip very short lines (ad-libs, sound effects)
+        if len(stripped) < 5:
+            continue
+
+        if stripped:
+            cleaned.append(stripped)
+
+    return "\n".join(cleaned)
+
+
+def _clean_lrc(content):
+    """Legacy alias for clean_lyrics_text - removes timestamps like [00:12.34] from LRC content."""
+    return clean_lyrics_text(content)
 
 
 def _get_mp3_lyrics(filepath):
@@ -153,10 +211,10 @@ def _get_mp3_lyrics(filepath):
 def _get_flac_lyrics(filepath):
     try:
         audio = FLAC(filepath)
-        if 'LYRICS' in audio:
-            return audio['LYRICS'][0]
-        if 'UNSYNCEDLYRICS' in audio:
-            return audio['UNSYNCEDLYRICS'][0]
+        if "LYRICS" in audio:
+            return audio["LYRICS"][0]
+        if "UNSYNCEDLYRICS" in audio:
+            return audio["UNSYNCEDLYRICS"][0]
     except Exception:
         pass
     return None
@@ -165,8 +223,8 @@ def _get_flac_lyrics(filepath):
 def _get_m4a_lyrics(filepath):
     try:
         audio = MP4(filepath)
-        if '©lyr' in audio:
-            return audio['©lyr'][0]
+        if "©lyr" in audio:
+            return audio["©lyr"][0]
     except Exception:
         pass
     return None
@@ -175,12 +233,11 @@ def _get_m4a_lyrics(filepath):
 def get_cache_stats():
     """Returns stats about the lyrics cache."""
     if not os.path.exists(config.LYRICS_CACHE_DIR):
-        return {'count': 0, 'size_mb': 0}
-    
-    files = [f for f in os.listdir(config.LYRICS_CACHE_DIR) if f.endswith('.txt')]
-    total_size = sum(os.path.getsize(os.path.join(config.LYRICS_CACHE_DIR, f)) for f in files)
-    
-    return {
-        'count': len(files),
-        'size_mb': round(total_size / (1024 * 1024), 2)
-    }
+        return {"count": 0, "size_mb": 0}
+
+    files = [f for f in os.listdir(config.LYRICS_CACHE_DIR) if f.endswith(".txt")]
+    total_size = sum(
+        os.path.getsize(os.path.join(config.LYRICS_CACHE_DIR, f)) for f in files
+    )
+
+    return {"count": len(files), "size_mb": round(total_size / (1024 * 1024), 2)}

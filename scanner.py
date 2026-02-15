@@ -14,8 +14,8 @@ import database
 import engine
 import analyzer
 import lyrics_extractor
+from lyrics_extractor import clean_lyrics_text
 import sentiment
-import numpy as np
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -25,7 +25,34 @@ import config
 log = get_logger("Scanner")
 
 SUPPORTED_EXTS = {".mp3", ".flac", ".wav", ".m4a", ".ogg"}
-MAX_WORKERS = 4  # Parallel audio processing - increase if you have more CPU cores
+
+
+def get_optimal_workers():
+    """Calculate optimal workers based on logical CPU cores.
+
+    Uses half the logical cores to leave headroom for:
+    - Database operations
+    - Embedding generation
+    - Web server threads
+    - OS background tasks
+    """
+    logical_cores = os.cpu_count() or 4
+    workers = max(2, logical_cores // 2)
+    return workers
+
+
+def get_optimal_batch_size(workers):
+    """Calculate batch size as 4x workers to keep workers fed."""
+    return workers * 4
+
+
+# Dynamic configuration based on hardware
+MAX_WORKERS = get_optimal_workers()
+BATCH_SIZE = get_optimal_batch_size(MAX_WORKERS)
+
+log.info(
+    f"Scanner configured: {MAX_WORKERS} workers, batch size {BATCH_SIZE} (detected {os.cpu_count()} logical cores)"
+)
 
 
 def get_metadata(filepath):
@@ -66,63 +93,6 @@ def get_metadata(filepath):
     return title, artist, album, genre
 
 
-def _clean_lyrics_text(lyrics_text):
-    """
-    Clean raw lyrics by stripping section headers, timestamps,
-    translations, and transliterations before analysis.
-    """
-    import re
-
-    if not lyrics_text:
-        return ""
-
-    lines = lyrics_text.split("\n")
-    cleaned = []
-
-    for line in lines:
-        stripped = line.strip()
-
-        # Skip empty lines
-        if not stripped:
-            continue
-
-        # Skip section headers like [Verse 1], [Chorus], [Hook], [Bridge], etc.
-        if re.match(
-            r"^\[(?:Verse|Chorus|Hook|Bridge|Intro|Outro|Pre-Chorus|Refrain|Interlude|Instrumental|Solo|Break|Skit|Spoken|Ad[- ]?lib)\s*\d*\]$",
-            stripped,
-            re.IGNORECASE,
-        ):
-            continue
-
-        # Skip LRC timestamps like [00:32.14]
-        stripped = re.sub(r"\[\d{1,2}:\d{2}(?:\.\d{2,3})?\]", "", stripped).strip()
-
-        # Skip translation markers like (Translation:) or lines in parentheses that look like translations
-        if re.match(
-            r"^\((?:Translation|Romanization|Romaji|English|Japanese)\s*:?\s*\)",
-            stripped,
-            re.IGNORECASE,
-        ):
-            continue
-
-        # Skip lines that are just credits or metadata
-        if re.match(
-            r"^(?:Written by|Produced by|Lyrics by|Composed by|Music by)",
-            stripped,
-            re.IGNORECASE,
-        ):
-            continue
-
-        # Skip very short lines (ad-libs, sound effects)
-        if len(stripped) < 5:
-            continue
-
-        if stripped:
-            cleaned.append(stripped)
-
-    return "\n".join(cleaned)
-
-
 def extract_lyrics_snippet(lyrics_text, max_length=600):
     """
     Extract the most emotionally relevant portion of lyrics.
@@ -134,7 +104,7 @@ def extract_lyrics_snippet(lyrics_text, max_length=600):
         return ""
 
     # Clean lyrics first
-    cleaned = _clean_lyrics_text(lyrics_text)
+    cleaned = clean_lyrics_text(lyrics_text)
     if not cleaned or len(cleaned.strip()) < 20:
         return ""
 
@@ -355,7 +325,7 @@ def process_file(filepath, enable_audio, enable_lyrics, enable_online_lyrics):
                 if lyrics:
                     has_lyrics = True
                     # Clean lyrics before analysis
-                    cleaned_lyrics = _clean_lyrics_text(lyrics)
+                    cleaned_lyrics = clean_lyrics_text(lyrics)
                     # Smart lyrics extraction with increased limit
                     lyrics_snippet = extract_lyrics_snippet(lyrics, max_length=600)
                     # Run emotion analysis on cleaned full lyrics
@@ -522,7 +492,6 @@ def scan_library(
     all_embeddings = []
 
     batch_data = []
-    BATCH_SIZE = 16
     count = 0
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
