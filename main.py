@@ -73,21 +73,25 @@ class PlaylistSaveRequest(BaseModel):
 
 
 def _format_song_response(
-    song: dict, score: Optional[float] = None, include_duration: bool = False
+    song, score: Optional[float] = None, include_duration: bool = False
 ) -> dict:
     """Helper to format song response consistently across endpoints."""
+    # Convert sqlite3.Row to dict if needed
+    if hasattr(song, "keys"):
+        song = dict(song)
+
     response = {
         "id": song["id"],
-        "title": song["title"] or "Unknown",
-        "artist": song["artist"] or "Unknown",
-        "album": song["album"] or "Unknown",
-        "genre": song["genre"] or "",
+        "title": song.get("title") or "Unknown",
+        "artist": song.get("artist") or "Unknown",
+        "album": song.get("album") or "Unknown",
+        "genre": song.get("genre") or "",
         "filepath": song["filepath"],
-        "bpm": song["bpm"],
-        "energy": song["energy"],
-        "valence": song["valence"],
+        "bpm": song.get("bpm"),
+        "energy": song.get("energy"),
+        "valence": song.get("valence"),
         "arousal": song.get("arousal"),
-        "has_lyrics": bool(song["has_lyrics"]),
+        "has_lyrics": bool(song.get("has_lyrics")),
         "score": float(score) if score is not None else None,
     }
 

@@ -581,11 +581,10 @@ def _rebuild_index_from_db():
     embeddings = eng.encode(texts)
     ids = [s["id"] for s in songs]
 
-    eng.save_index(ids, embeddings)
-
-    # Update in-memory state so immediate queries work
+    # Set in-memory state BEFORE saving (save_index uses self.embeddings/self.ids)
     eng.embeddings = embeddings
     eng.ids = ids
+    eng.save_index()
 
 
 def _process_batch(batch, all_ids, all_embeddings, eng):

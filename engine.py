@@ -61,10 +61,29 @@ class VectorEngine:
         self.ids_path = config.IDS_PATH
 
     def load_model(self):
-        """Load the sentence transformer model."""
+        """Load the sentence transformer model with offline support."""
         if self.model is None:
             log.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-            self.model = SentenceTransformer(EMBEDDING_MODEL)
+            try:
+                self.model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
+                log.info("Model loaded from local cache")
+            except Exception as e:
+                log.debug(f"Local load failed: {e}")
+                try:
+                    self.model = SentenceTransformer(EMBEDDING_MODEL)
+                except Exception as download_error:
+                    raise RuntimeError(
+                        f"\n\n"
+                        f"{'=' * 60}\n"
+                        f"MODEL NOT FOUND LOCALLY\n"
+                        f"{'=' * 60}\n"
+                        f"The embedding model '{EMBEDDING_MODEL}' is not cached.\n"
+                        f"You need internet for the initial download.\n\n"
+                        f"Run this command once with internet:\n"
+                        f'  python -c "from sentence_transformers import SentenceTransformer; '
+                        f"SentenceTransformer('{EMBEDDING_MODEL}')\"\n"
+                        f"{'=' * 60}\n"
+                    ) from download_error
         return self.model
 
     def encode(self, texts):

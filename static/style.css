@@ -1248,8 +1248,13 @@ input[type="text"]:focus {
   50% { opacity: 1; }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .loading {
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: spin 1s linear infinite;
 }
 
 /* Fade In Animation */
