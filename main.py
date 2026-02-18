@@ -42,7 +42,7 @@ scan_status = {
 class ScanRequest(BaseModel):
     path: str
     enable_audio: bool = True
-    enable_lyrics: bool = True
+    enable_lyrics: bool = False
     enable_online_lyrics: bool = False
 
 

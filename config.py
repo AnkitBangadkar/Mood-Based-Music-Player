@@ -1,5 +1,8 @@
 import os
 
+# Base directory (where this script is located)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # --- Hardware / Tier Configuration ---
 SYSTEM_TIER = os.getenv("PBL_TIER", "normal")
 
@@ -7,10 +10,7 @@ SYSTEM_TIER = os.getenv("PBL_TIER", "normal")
 MODEL_EMBEDDING = "sentence-transformers/all-mpnet-base-v2"
 
 # --- Lyrics Cache ---
-# Store fetched lyrics in a separate folder to keep music folders clean
-LYRICS_CACHE_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "lyrics_cache"
-)
+LYRICS_CACHE_DIR = os.path.join(BASE_DIR, "lyrics_cache")
 
 # --- Mood Mapping Thresholds ---
 MOOD_THRESHOLDS = {
@@ -22,7 +22,7 @@ MOOD_THRESHOLDS = {
     "brightness_bright": 3000,
 }
 
-# --- Paths ---
-DB_PATH = "library.db"
-EMBEDDINGS_PATH = "embeddings_v3.npy"
-IDS_PATH = "ids_v3.json"
+# --- Paths (absolute, relative to this script) ---
+DB_PATH = os.path.join(BASE_DIR, "library.db")
+EMBEDDINGS_PATH = os.path.join(BASE_DIR, "embeddings_v3.npy")
+IDS_PATH = os.path.join(BASE_DIR, "ids_v3.json")

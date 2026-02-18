@@ -67,7 +67,7 @@ QUERY_SYNONYMS = {
     "dreamy": ["chill", "calm", "peaceful"],
     "intense": ["intense", "angry", "energetic"],
     "powerful": ["hype", "energetic", "intense"],
-    "epic": ["intense", "energetic", "hype"],
+    "epic": ["anthemic", "dramatic"],
     "mysterious": ["mysterious", "dark", "moody"],
     "dark": ["dark", "somber", "moody"],
     "scary": ["dark", "intense", "fear"],
@@ -476,6 +476,10 @@ FEATURE_PROFILES = {
         "brightness": (3900, 0.50),
         "dynamic_range": (2.1, 0.55),
     },
+    "epic": {
+        "dynamic_range": (2.0, 0.70),
+        "brightness": (1600, 0.40),
+    },
 }
 
 
@@ -518,7 +522,6 @@ QUERY_EMOTION_TARGETS = {
     "fear": {"fear": 1.0, "surprise": 0.3},
     "scary": {"fear": 1.0, "surprise": 0.4},
     "horror": {"fear": 1.0, "anger": 0.3},
-    "fear": {"fear": 1.0, "surprise": 0.3},
     "hate": {"anger": 1.0, "disgust": 0.4},
 }
 

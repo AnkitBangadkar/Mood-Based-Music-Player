@@ -1,10 +1,11 @@
 import sqlite3
 import threading
 from logger import get_logger
+import config
 
 log = get_logger("Database")
 
-DB_PATH = "library.db"
+DB_PATH = config.DB_PATH
 
 # Thread-local storage for connection pooling
 _local = threading.local()

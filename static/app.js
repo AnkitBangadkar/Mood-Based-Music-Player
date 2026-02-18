@@ -227,8 +227,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const j = Math.floor(Math.random() * (i + 1));
                 [queue[i], queue[j]] = [queue[j], queue[i]];
             }
-            renderSongList();
             currentIndex = 0; // Reset index to top of shuffled list
+            renderSongList();
             loadSong(0);
         }
     });

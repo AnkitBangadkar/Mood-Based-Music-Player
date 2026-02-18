@@ -74,15 +74,19 @@ class VectorEngine:
                 except Exception as download_error:
                     raise RuntimeError(
                         f"\n\n"
-                        f"{'=' * 60}\n"
-                        f"MODEL NOT FOUND LOCALLY\n"
-                        f"{'=' * 60}\n"
-                        f"The embedding model '{EMBEDDING_MODEL}' is not cached.\n"
-                        f"You need internet for the initial download.\n\n"
-                        f"Run this command once with internet:\n"
-                        f'  python -c "from sentence_transformers import SentenceTransformer; '
+                        f"{'=' * 70}\n"
+                        f"  EMBEDDING MODEL NOT FOUND - FIRST-TIME SETUP REQUIRED\n"
+                        f"{'=' * 70}\n"
+                        f"\n"
+                        f"  The model '{EMBEDDING_MODEL}' is not cached locally.\n"
+                        f"  Initial download requires internet. After that, it works offline.\n"
+                        f"\n"
+                        f"  Run this command ONCE with internet connection:\n"
+                        f"\n"
+                        f'    python -c "from sentence_transformers import SentenceTransformer; '
                         f"SentenceTransformer('{EMBEDDING_MODEL}')\"\n"
-                        f"{'=' * 60}\n"
+                        f"\n"
+                        f"{'=' * 70}\n"
                     ) from download_error
         return self.model
 
@@ -270,13 +274,13 @@ def build_emotion_targets(keywords):
     return targets
 
 
-def compute_gaussian_match(value, target, sigma):
+def compute_gaussian_match(value, target, sigma, allow_negative=False):
     """Gaussian similarity: 1.0 at target, approaches 0 as value diverges."""
     try:
         value = float(value) if value is not None else 0.0
     except (ValueError, TypeError):
         return 0.0
-    if value <= 0:
+    if not allow_negative and value <= 0:
         return 0.0
     diff = abs(value - target)
     return np.exp(-(diff**2) / (2 * sigma**2))
@@ -316,11 +320,15 @@ def compute_feature_score(song, profile):
         elif feat == "energy" and energy > 0:
             match = compute_gaussian_match(energy, target, SIGMA_ENERGY)
 
-        elif feat == "valence" and valence != 0:
-            match = compute_gaussian_match(valence, target, SIGMA_VALENCE)
+        elif feat == "valence":
+            match = compute_gaussian_match(
+                valence, target, SIGMA_VALENCE, allow_negative=True
+            )
 
         elif feat == "arousal":
-            match = compute_gaussian_match(arousal, target, SIGMA_AROUSAL)
+            match = compute_gaussian_match(
+                arousal, target, SIGMA_AROUSAL, allow_negative=True
+            )
 
         elif feat == "brightness" and brightness > 0:
             match = compute_gaussian_match(brightness, target, SIGMA_BRIGHTNESS)
@@ -424,6 +432,10 @@ def search(query, limit=20):
     if engine.embeddings is None:
         if not engine.load_index():
             return []
+        # Defensive check in case load_index succeeded but embeddings is still None
+        if engine.embeddings is None or engine.ids is None:
+            log.error("Failed to load embeddings index - index may be corrupted")
+            return []
 
     # ─── STEP 1: Parse query ───
     clean_query, negated_keywords = parse_query(query)
@@ -447,10 +459,31 @@ def search(query, limit=20):
     has_negation = len(negated_keywords) > 0
 
     # ─── STEP 4: Calculate weights ───
+    # Base weights from constants
     w_sem = W_SEMANTIC
     w_feat = W_FEATURES if has_feature else 0.0
     w_genre = W_GENRE if has_genre else 0.0
     w_emotion = W_EMOTION if has_emotion else 0.0
+
+    # Boost feature weight for acoustic property queries
+    # These keywords have reliable feature profiles where audio features matter more than semantics
+    ACOUSTIC_KEYWORDS = {
+        "epic",
+        "cinematic",
+        "dramatic",
+        "dark",
+        "bright",
+        "calm",
+        "energetic",
+        "sad",
+        "happy",
+        "chill",
+        "intense",
+        "relaxing",
+        "melancholy",
+    }
+    if any(kw in ACOUSTIC_KEYWORDS for kw in keywords):
+        w_feat *= 1.5  # Boost feature weight by 50% for acoustic queries
 
     # Redistribute unused weight
     total_active = w_sem + w_feat + w_genre + w_emotion
