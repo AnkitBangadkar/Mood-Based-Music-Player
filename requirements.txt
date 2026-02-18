@@ -1,4 +1,5 @@
 fastapi>=0.100
+numba>=0.60
 uvicorn>=0.22
 sentence-transformers>=2.2
 transformers>=4.30

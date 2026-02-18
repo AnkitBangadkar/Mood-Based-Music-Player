@@ -7,6 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let isRepeating = false;
     let scanInterval = null;
 
+    // Safe lucide helper
+    function refreshIcons() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
     // DOM Elements
     const audioPlayer = document.getElementById("audio-player");
     const playPauseBtn = document.getElementById("play-pause-btn");
@@ -108,11 +113,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updatePlayPauseIcon() {
-        const icon = playPauseBtn.querySelector('i');
-        if (icon) {
-            icon.setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
-            lucide.createIcons();
-        }
+        playPauseBtn.innerHTML = `<i data-lucide="${isPlaying ? 'pause' : 'play'}"></i>`;
+        refreshIcons();
     }
 
     function updateSongListPlayingState() {
@@ -129,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 indexSpan.innerHTML = `<span>${i + 1}</span><i data-lucide="play"></i>`;
             }
         });
-        lucide.createIcons();
+        refreshIcons();
     }
 
     function playSong() {
@@ -281,9 +283,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         generateBtn.disabled = true;
         generateBtn.innerHTML = '<i data-lucide="loader-2" class="loading"></i> Generating...';
-        lucide.createIcons();
+        refreshIcons();
         songListEl.innerHTML = '<div class="empty-state"><i data-lucide="loader-2" class="loading"></i><p>Searching for "' + prompt + '"...</p></div>';
-        lucide.createIcons();
+        refreshIcons();
 
         try {
             const res = await fetch("/generate", {
@@ -332,24 +334,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     songListEl.insertBefore(warningDiv, songListEl.firstChild);
                 }
                 
-                lucide.createIcons();
+                refreshIcons();
                 
                 // Don't auto-play, just load first song
                 loadSong(0, false);
                 pauseSong(); 
             } else {
                 songListEl.innerHTML = '<div class="empty-state"><i data-lucide="search-x"></i><p>No songs found matching that mood.</p></div>';
-                lucide.createIcons();
+                refreshIcons();
             }
 
         } catch (err) {
             console.error(err);
             songListEl.innerHTML = `<div class="empty-state"><i data-lucide="alert-circle"></i><p>Error: ${err.message}</p></div>`;
-            lucide.createIcons();
+            refreshIcons();
         } finally {
             generateBtn.disabled = false;
             generateBtn.innerHTML = '<i data-lucide="wand-2"></i> Generate Playlist';
-            lucide.createIcons();
+            refreshIcons();
         }
     });
 
@@ -403,7 +405,7 @@ document.addEventListener("DOMContentLoaded", () => {
             div.addEventListener("click", () => loadSong(index));
             songListEl.appendChild(div);
         });
-        lucide.createIcons();
+        refreshIcons();
     }
 
     // --- Library Management ---
@@ -440,12 +442,12 @@ document.addEventListener("DOMContentLoaded", () => {
             libraryLastScan.innerText = 'Last scan: Never';
         }
         
-        lucide.createIcons();
+        refreshIcons();
     }
 
     function toggleLibraryDropdown() {
         libraryDropdown.classList.toggle("hidden");
-        lucide.createIcons();
+        refreshIcons();
     }
 
     function hideLibraryDropdown() {
@@ -488,7 +490,7 @@ document.addEventListener("DOMContentLoaded", () => {
         hideLibraryDropdown();
         flushModal.classList.remove("hidden");
         flushModal.classList.add("visible");
-        lucide.createIcons();
+        refreshIcons();
     });
 
     cancelFlushBtn.addEventListener("click", () => {
@@ -499,7 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
     confirmFlushBtn.addEventListener("click", async () => {
         confirmFlushBtn.disabled = true;
         confirmFlushBtn.innerHTML = '<i data-lucide="loader-2" class="loading"></i> Flushing...';
-        lucide.createIcons();
+        refreshIcons();
 
         try {
             const res = await fetch("/library/flush", { method: "POST" });
@@ -513,27 +515,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 queue = [];
                 renderSongList();
                 songListEl.innerHTML = '<div class="empty-state"><i data-lucide="music-2"></i><p>Library cleared. Scan to add songs.</p></div>';
-                lucide.createIcons();
+                refreshIcons();
                 
                 confirmFlushBtn.innerHTML = '<i data-lucide="check"></i> Flushed!';
-                lucide.createIcons();
+                refreshIcons();
                 setTimeout(() => {
                     flushModal.classList.add("hidden");
                     flushModal.classList.remove("visible");
                     confirmFlushBtn.disabled = false;
                     confirmFlushBtn.innerHTML = '<i data-lucide="trash-2"></i> Yes, Flush Library';
-                    lucide.createIcons();
+                    refreshIcons();
                 }, 1500);
             } else {
                 throw new Error('Flush failed');
             }
         } catch (err) {
             confirmFlushBtn.innerHTML = '<i data-lucide="alert-circle"></i> Error';
-            lucide.createIcons();
+            refreshIcons();
             setTimeout(() => {
                 confirmFlushBtn.disabled = false;
                 confirmFlushBtn.innerHTML = '<i data-lucide="trash-2"></i> Yes, Flush Library';
-                lucide.createIcons();
+                refreshIcons();
             }, 2000);
         }
     });
@@ -558,7 +560,7 @@ document.addEventListener("DOMContentLoaded", () => {
         scanPanelFile.innerText = '';
         scanCompleteActions.classList.remove("hidden");
         
-        lucide.createIcons();
+        refreshIcons();
     }
 
     function minimizeScanPanel() {
@@ -654,7 +656,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `).join('');
         
-        lucide.createIcons();
+        refreshIcons();
         
         // Add click handlers
         pathHistoryList.querySelectorAll('.path-history-item').forEach(item => {
@@ -720,7 +722,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         </div>
                     </div>
                 `).join('');
-                lucide.createIcons();
+                refreshIcons();
             } else {
                 foldersList.innerHTML = '<p class="no-folders">No folders indexed yet</p>';
             }
@@ -755,7 +757,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         confirmScanBtn.disabled = true;
         confirmScanBtn.innerHTML = '<i data-lucide="loader-2" class="loading"></i> Starting...';
-        lucide.createIcons();
+        refreshIcons();
 
         try {
             const res = await fetch("/scan", {
@@ -781,20 +783,20 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 const err = await res.json();
                 confirmScanBtn.innerHTML = '<i data-lucide="alert-circle"></i> Error';
-                lucide.createIcons();
+                refreshIcons();
                 setTimeout(() => {
                     confirmScanBtn.disabled = false;
                     confirmScanBtn.innerHTML = '<i data-lucide="search"></i> Start Scan';
-                    lucide.createIcons();
+                    refreshIcons();
                 }, 2000);
             }
         } catch (err) {
             confirmScanBtn.innerHTML = '<i data-lucide="alert-circle"></i> Network Error';
-            lucide.createIcons();
+            refreshIcons();
             setTimeout(() => {
                 confirmScanBtn.disabled = false;
                 confirmScanBtn.innerHTML = '<i data-lucide="search"></i> Start Scan';
-                lucide.createIcons();
+                refreshIcons();
             }, 2000);
         }
     });
@@ -903,7 +905,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 scanCompleteActions.classList.add("hidden");
             }
             
-            lucide.createIcons();
+            refreshIcons();
             
             if (!status.is_scanning) {
                 if (scanInterval) {
