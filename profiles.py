@@ -326,6 +326,11 @@ FEATURE_PROFILES = {
         "energy": (0.28, 1.0),
         "bpm": (130, 0.6),
         "mode_major": (False, 0.7),
+        "spectral_rolloff": (
+            3200,
+            0.4,
+        ),  # Lower rolloff = darker, more aggressive sound
+        "spectral_bandwidth": (3000, 0.3),  # Wider bandwidth = more raw energy
     },
     "intense": {
         "arousal": (0.8, 0.7),

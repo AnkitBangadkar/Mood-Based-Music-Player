@@ -1,6 +1,9 @@
 fastapi>=0.100
 uvicorn>=0.22
 sentence-transformers>=2.2
+transformers>=4.30
+torch>=2.0
+pydantic>=2.0
 mutagen>=1.47
 numpy>=1.26
 python-multipart>=0.0.6

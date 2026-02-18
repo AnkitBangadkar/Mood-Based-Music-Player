@@ -1375,3 +1375,239 @@ input[type="text"]:focus {
   font-size: 0.875rem;
   margin: 0;
 }
+
+/* ============================================
+   PATH HISTORY & INDEXED FOLDERS
+   ============================================ */
+
+/* Path Input Container */
+.path-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.path-input-container input {
+  flex: 1;
+  padding-right: 2.5rem;
+}
+
+.path-history-toggle {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.path-history-toggle:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg-hover);
+}
+
+.path-history-toggle svg {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.2s ease;
+}
+
+.path-history-toggle.active svg {
+  transform: rotate(180deg);
+}
+
+/* Path History Dropdown */
+.path-history-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--glass-surface-elevated);
+  backdrop-filter: blur(var(--blur-lg));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+}
+
+.path-history-dropdown.hidden {
+  display: none;
+}
+
+.path-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.clear-history {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.clear-history:hover {
+  background: var(--accent-subtle);
+}
+
+.path-history-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.path-history-item:last-child {
+  border-bottom: none;
+}
+
+.path-history-item:hover {
+  background: var(--glass-bg-hover);
+}
+
+.path-history-item svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.path-history-item span {
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.path-history-item .remove-path {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.path-history-item:hover .remove-path {
+  opacity: 1;
+}
+
+.path-history-item .remove-path:hover {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.1);
+}
+
+.path-history-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Indexed Folders Section */
+.indexed-folders-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+.indexed-folders-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.indexed-folders-section h3 svg {
+  width: 16px;
+  height: 16px;
+  color: #30d158;
+}
+
+.indexed-folders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.indexed-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.indexed-folder-item:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-highlight);
+}
+
+.indexed-folder-item svg {
+  width: 18px;
+  height: 18px;
+  color: #30d158;
+  flex-shrink: 0;
+}
+
+.indexed-folder-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.indexed-folder-path {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.indexed-folder-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.no-folders {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+  padding: 1rem;
+  text-align: center;
+}

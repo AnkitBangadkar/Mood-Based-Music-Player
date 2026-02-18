@@ -595,12 +595,149 @@ document.addEventListener("DOMContentLoaded", () => {
         scanCompleteActions.classList.add("hidden");
     });
 
+    // Path History Management
+    const PATH_HISTORY_KEY = 'scanPathHistory';
+    const MAX_PATH_HISTORY = 5;
+    
+    function getPathHistory() {
+        try {
+            return JSON.parse(localStorage.getItem(PATH_HISTORY_KEY) || '[]');
+        } catch {
+            return [];
+        }
+    }
+    
+    function addPathToHistory(path) {
+        if (!path) return;
+        let history = getPathHistory();
+        // Remove if already exists
+        history = history.filter(p => p !== path);
+        // Add to beginning
+        history.unshift(path);
+        // Keep only MAX_PATH_HISTORY items
+        history = history.slice(0, MAX_PATH_HISTORY);
+        localStorage.setItem(PATH_HISTORY_KEY, JSON.stringify(history));
+    }
+    
+    function removePathFromHistory(path) {
+        let history = getPathHistory();
+        history = history.filter(p => p !== path);
+        localStorage.setItem(PATH_HISTORY_KEY, JSON.stringify(history));
+        renderPathHistory();
+    }
+    
+    function clearPathHistory() {
+        localStorage.removeItem(PATH_HISTORY_KEY);
+        renderPathHistory();
+    }
+    
+    // Path History UI Elements
+    const pathHistoryBtn = document.getElementById("path-history-btn");
+    const pathHistoryDropdown = document.getElementById("path-history-dropdown");
+    const pathHistoryList = document.getElementById("path-history-list");
+    const clearHistoryBtn = document.getElementById("clear-history-btn");
+    
+    function renderPathHistory() {
+        const history = getPathHistory();
+        if (history.length === 0) {
+            pathHistoryList.innerHTML = '<div class="path-history-empty">No recent paths</div>';
+            return;
+        }
+        
+        pathHistoryList.innerHTML = history.map(path => `
+            <div class="path-history-item" data-path="${path}">
+                <i data-lucide="folder"></i>
+                <span>${path}</span>
+                <button class="remove-path" data-path="${path}" title="Remove from history">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        `).join('');
+        
+        lucide.createIcons();
+        
+        // Add click handlers
+        pathHistoryList.querySelectorAll('.path-history-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-path')) return;
+                const path = item.dataset.path;
+                scanPathInput.value = path;
+                pathHistoryDropdown.classList.add('hidden');
+                pathHistoryBtn.classList.remove('active');
+            });
+        });
+        
+        pathHistoryList.querySelectorAll('.remove-path').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removePathFromHistory(btn.dataset.path);
+            });
+        });
+    }
+    
+    // Toggle path history dropdown
+    if (pathHistoryBtn) {
+        pathHistoryBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = pathHistoryDropdown.classList.contains('hidden');
+            pathHistoryDropdown.classList.toggle('hidden', !isHidden);
+            pathHistoryBtn.classList.toggle('active', isHidden);
+            if (isHidden) renderPathHistory();
+        });
+    }
+    
+    // Clear history button
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', clearPathHistory);
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.path-input-container')) {
+            pathHistoryDropdown.classList.add('hidden');
+            pathHistoryBtn.classList.remove('active');
+        }
+    });
+    
+    // Indexed Folders Loading
+    async function loadIndexedFolders() {
+        const foldersList = document.getElementById('indexed-folders-list');
+        if (!foldersList) return;
+        
+        try {
+            const res = await fetch("/scan/folders");
+            const data = await res.json();
+            
+            if (data.folders && data.folders.length > 0) {
+                foldersList.innerHTML = data.folders.map(folder => `
+                    <div class="indexed-folder-item">
+                        <i data-lucide="folder-check"></i>
+                        <div class="indexed-folder-info">
+                            <div class="indexed-folder-path">${folder.path}</div>
+                            <div class="indexed-folder-meta">
+                                ${folder.song_count} songs • Last scan: ${folder.last_scan_formatted}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            } else {
+                foldersList.innerHTML = '<p class="no-folders">No folders indexed yet</p>';
+            }
+        } catch (err) {
+            console.error("Failed to load indexed folders:", err);
+            foldersList.innerHTML = '<p class="no-folders">Failed to load folders</p>';
+        }
+    }
+    
     scanBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         console.log("Scan button clicked");
         scanModal.classList.remove("hidden");
         scanModal.classList.add("visible");
         scanPathInput.focus();
+        renderPathHistory();
+        loadIndexedFolders();
     });
     
     // Debug: ensure elements exist
@@ -637,6 +774,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 scanModal.classList.remove("visible");
                 scanProgressPanel.classList.remove("hidden");
                 isScanMinimized = false;
+                addPathToHistory(path); // Save to history
                 scanPathInput.value = ''; // Clear input
                 libraryProgress.classList.add("hidden");
                 startPollingScan();

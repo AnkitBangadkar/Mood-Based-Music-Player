@@ -289,9 +289,9 @@ def build_mood_text(
     feature_str = ". ".join(features) + "." if features else ""
 
     # Clean title for embedding (remove track numbers, metadata tags)
-    # Keep original artist name as it provides genre hints
+    # Use only title (not artist) to avoid false matches from artist names
     cleaned_title = clean_title_for_embedding(title)
-    meta = f"{artist} - {cleaned_title}"
+    meta = cleaned_title
 
     lyrics_part = ""
     if lyrics_snippet and len(lyrics_snippet) > 20:
@@ -617,6 +617,9 @@ def scan_library(
     cache_stats = lyrics_extractor.get_cache_stats()
     log.info(f"Lyrics cache: {cache_stats['count']} files, {cache_stats['size_mb']} MB")
 
+    # Track this folder as scanned
+    database.add_or_update_scanned_folder(directory_path, song_count=count)
+
     if progress_callback:
         progress_callback(
             {
@@ -632,19 +635,51 @@ def scan_library(
 
 
 def _rebuild_index_from_db():
-    """Rebuild the vector index from all songs in the database."""
-    eng = engine.get_engine()
-    songs = database.get_all_songs()
+    """Rebuild the vector index from all songs in the database.
 
-    if not songs:
+    Uses stored embeddings when available, only encodes new songs.
+    This makes incremental scans much faster.
+    """
+    import numpy as np
+
+    eng = engine.get_engine()
+
+    # Get songs with embeddings from DB
+    songs_with_embeddings = database.get_all_songs_with_embeddings()
+
+    if not songs_with_embeddings:
         return
 
-    # Re-embed all songs (necessary because embeddings aren't stored in DB)
-    texts = [s["rich_description"] for s in songs]
-    embeddings = eng.encode(texts)
-    ids = [s["id"] for s in songs]
+    ids = []
+    embeddings_list = []
+    songs_to_encode = []  # Songs without embeddings
 
-    # Set in-memory state BEFORE saving (save_index uses self.embeddings/self.ids)
+    for song in songs_with_embeddings:
+        ids.append(song["id"])
+        if song.get("embedding") is not None:
+            # Use stored embedding
+            embeddings_list.append(song["embedding"])
+        else:
+            # Need to encode this song
+            songs_to_encode.append(song)
+
+    # Encode any songs that don't have stored embeddings
+    if songs_to_encode:
+        log.info(f"Encoding {len(songs_to_encode)} songs without stored embeddings...")
+        texts = [s["rich_description"] for s in songs_to_encode]
+        new_embeddings = eng.encode(texts, is_query=False)
+
+        # Store new embeddings and add to list
+        for i, song in enumerate(songs_to_encode):
+            database.update_song_embedding(song["id"], new_embeddings[i])
+            # Insert embedding at correct position
+            idx = ids.index(song["id"])
+            embeddings_list.insert(idx, new_embeddings[i])
+
+    # Convert to numpy array
+    embeddings = np.array(embeddings_list)
+
+    # Set in-memory state BEFORE saving
     eng.embeddings = embeddings
     eng.ids = ids
     eng.save_index()
@@ -653,7 +688,7 @@ def _rebuild_index_from_db():
 def _process_batch(batch, all_ids, all_embeddings, eng):
     """Process a batch of songs - embed and store."""
     texts = [d["mood_text"] for d in batch]
-    embeddings = eng.encode(texts)
+    embeddings = eng.encode(texts, is_query=False)
 
     for i, d in enumerate(batch):
         song_id = database.add_song(
@@ -686,3 +721,5 @@ def _process_batch(batch, all_ids, all_embeddings, eng):
         if song_id:
             all_ids.append(song_id)
             all_embeddings.append(embeddings[i])
+            # Store embedding in database for incremental indexing
+            database.update_song_embedding(song_id, embeddings[i])

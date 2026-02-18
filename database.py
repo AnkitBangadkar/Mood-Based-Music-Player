@@ -48,9 +48,22 @@ def init_db():
             rich_description TEXT,
             lyrics_vec BLOB,
             audio_vec BLOB,
-            meta_vec BLOB
+            meta_vec BLOB,
+            embedding BLOB
         )
     """)
+
+    # Create scanned_folders table to track indexed directories
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scanned_folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT UNIQUE NOT NULL,
+            last_scan_time REAL,
+            song_count INTEGER DEFAULT 0,
+            total_songs_in_db INTEGER DEFAULT 0
+        )
+    """)
+
     # Add new columns if they don't exist (migration for existing DBs)
     migrations = [
         "ALTER TABLE songs ADD COLUMN file_mtime REAL",
@@ -65,6 +78,8 @@ def init_db():
         "ALTER TABLE songs ADD COLUMN spectral_bandwidth REAL",
         "ALTER TABLE songs ADD COLUMN dynamic_range REAL",
         "ALTER TABLE songs ADD COLUMN mfccs TEXT",  # JSON string of 13 floats
+        # Embedding storage for incremental indexing
+        "ALTER TABLE songs ADD COLUMN embedding BLOB",
     ]
     for migration in migrations:
         try:
@@ -225,3 +240,114 @@ def get_song_count():
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) as count FROM songs")
     return cursor.fetchone()["count"]
+
+
+def update_song_embedding(song_id, embedding):
+    """Store the embedding vector for a song."""
+    if embedding is None:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Convert numpy array to bytes
+        embedding_bytes = (
+            embedding.tobytes() if hasattr(embedding, "tobytes") else embedding
+        )
+        cursor.execute(
+            "UPDATE songs SET embedding = ? WHERE id = ?", (embedding_bytes, song_id)
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        log.error(f"Error storing embedding for song {song_id}: {e}")
+
+
+def get_songs_with_embeddings():
+    """Get all songs that have embeddings stored."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, embedding FROM songs WHERE embedding IS NOT NULL")
+    return cursor.fetchall()
+
+
+def get_all_songs_with_embeddings():
+    """Get all songs with their embeddings loaded."""
+    import numpy as np
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM songs")
+    songs = cursor.fetchall()
+
+    result = []
+    for song in songs:
+        song_dict = dict(song)
+        if song_dict.get("embedding"):
+            # Convert bytes back to numpy array
+            try:
+                song_dict["embedding"] = np.frombuffer(
+                    song_dict["embedding"], dtype=np.float32
+                )
+            except Exception as e:
+                log.warning(f"Failed to load embedding for song {song_dict['id']}: {e}")
+                song_dict["embedding"] = None
+        result.append(song_dict)
+    return result
+
+
+# Scanned folders tracking
+def add_or_update_scanned_folder(path, song_count=0):
+    """Add or update a scanned folder entry."""
+    import time
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    total_songs = get_song_count()
+    try:
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO scanned_folders (path, last_scan_time, song_count, total_songs_in_db)
+            VALUES (?, ?, ?, ?)
+            """,
+            (path, time.time(), song_count, total_songs),
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        log.error(f"Error updating scanned folder {path}: {e}")
+
+
+def get_scanned_folders():
+    """Get list of all scanned folders with metadata."""
+    import time
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT path, last_scan_time, song_count, total_songs_in_db FROM scanned_folders ORDER BY last_scan_time DESC"
+    )
+    folders = []
+    for row in cursor.fetchall():
+        folders.append(
+            {
+                "path": row["path"],
+                "last_scan_time": row["last_scan_time"],
+                "last_scan_formatted": time.strftime(
+                    "%Y-%m-%d %H:%M", time.localtime(row["last_scan_time"])
+                )
+                if row["last_scan_time"]
+                else "Unknown",
+                "song_count": row["song_count"],
+                "total_songs_in_db": row["total_songs_in_db"],
+            }
+        )
+    return folders
+
+
+def remove_scanned_folder(path):
+    """Remove a folder from the scanned folders list."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM scanned_folders WHERE path = ?", (path,))
+        conn.commit()
+    except sqlite3.Error as e:
+        log.error(f"Error removing scanned folder {path}: {e}")

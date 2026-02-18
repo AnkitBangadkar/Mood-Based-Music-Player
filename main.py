@@ -267,6 +267,23 @@ def get_scan_status():
     }
 
 
+@app.get("/scan/folders")
+def get_scanned_folders():
+    """Get list of all scanned folders with metadata"""
+    folders = database.get_scanned_folders()
+    return {"folders": folders}
+
+
+@app.delete("/scan/folders/{folder_path:path}")
+def remove_scanned_folder_endpoint(folder_path: str):
+    """Remove a folder from the scanned folders tracking (does not delete songs)"""
+    database.remove_scanned_folder(folder_path)
+    return {
+        "status": "success",
+        "message": f"Removed {folder_path} from tracked folders",
+    }
+
+
 @app.post("/generate", response_model=List[SongResponse])
 def generate_playlist(request: GenerateRequest):
     results = engine.search(request.prompt, limit=request.limit or 20)

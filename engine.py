@@ -86,11 +86,24 @@ class VectorEngine:
                     ) from download_error
         return self.model
 
-    def encode(self, texts):
-        """Encode text(s) to embeddings."""
+    def encode(self, texts, is_query=False):
+        """Encode text(s) to embeddings with instruction prefixes for BGE models."""
         model = self.load_model()
         if isinstance(texts, str):
             texts = [texts]
+
+        # Add instruction prefixes for BGE models
+        if "bge" in EMBEDDING_MODEL.lower():
+            if is_query:
+                # For user queries
+                texts = [
+                    f"Represent this sentence for searching relevant passages: {t}"
+                    for t in texts
+                ]
+            else:
+                # For song descriptions (passages)
+                texts = [f"Represent this passage for retrieval: {t}" for t in texts]
+
         return model.encode(texts, convert_to_numpy=True)
 
     def build_index(self, songs, save=True):
@@ -103,7 +116,7 @@ class VectorEngine:
         texts = [s.get("rich_description", "") or "" for s in songs]
 
         log.info(f"Encoding {len(texts)} songs...")
-        self.embeddings = self.encode(texts)
+        self.embeddings = self.encode(texts, is_query=False)
         self.ids = [s["id"] for s in songs]
 
         if save:
@@ -417,7 +430,7 @@ def search(query, limit=20):
     log.info(f"Query: '{query}' -> clean: '{clean_query}', negated: {negated_keywords}")
 
     # ─── STEP 2: Semantic similarity ───
-    query_vec = engine.encode(clean_query)
+    query_vec = engine.encode(clean_query, is_query=True)
     raw_similarities = util.cos_sim(query_vec, engine.embeddings)[0].numpy()
 
     log.info(f"Top raw similarity: {np.max(raw_similarities):.4f}")

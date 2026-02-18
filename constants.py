@@ -9,7 +9,7 @@ All magic numbers and tuning parameters in one place.
 W_SEMANTIC = 0.35  # Weight for semantic (embedding) similarity
 W_FEATURES = 0.40  # Weight for audio feature matching
 W_GENRE = 0.12  # Weight for genre matching
-W_EMOTION = 0.13  # Weight for lyrics emotion matching
+W_EMOTION = 0.0  # Set to 0.0 since no lyrics in metadata - weight redistributes to semantic/features
 
 # ──────────────────────────────────────────────────────────────────────
 # GAUSSIAN SIGMA VALUES (for feature matching)
@@ -85,5 +85,5 @@ AROUSAL_ENERGY_WEIGHT = 0.3  # Weight of energy contribution
 # ──────────────────────────────────────────────────────────────────────
 # SEMANTIC SEARCH
 # ──────────────────────────────────────────────────────────────────────
-EMBEDDING_MODEL = "all-mpnet-base-v2"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 COSINE_THRESHOLD = 0.3  # Minimum cosine similarity to consider relevant

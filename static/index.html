@@ -165,7 +165,29 @@
         <div class="modal-content scan-modal">
             <h2><i data-lucide="folder-search"></i> Scan Library</h2>
             <p>Enter the absolute path to your music folder to index your collection.</p>
-            <input type="text" id="scan-path-input" placeholder="/home/user/Music">
+            
+            <!-- Path input with history dropdown -->
+            <div class="path-input-container">
+                <input type="text" id="scan-path-input" placeholder="/home/user/Music" autocomplete="off">
+                <button id="path-history-btn" class="path-history-toggle" title="Show recent paths">
+                    <i data-lucide="chevron-down"></i>
+                </button>
+                <div id="path-history-dropdown" class="path-history-dropdown hidden">
+                    <div class="path-history-header">
+                        <span>Recent Paths</span>
+                        <button id="clear-history-btn" class="clear-history">Clear</button>
+                    </div>
+                    <div id="path-history-list"></div>
+                </div>
+            </div>
+
+            <!-- Indexed folders section -->
+            <div id="indexed-folders-section" class="indexed-folders-section">
+                <h3><i data-lucide="folder-check"></i> Currently Indexed Folders</h3>
+                <div id="indexed-folders-list" class="indexed-folders-list">
+                    <p class="no-folders">Loading...</p>
+                </div>
+            </div>
             
             <div class="modal-buttons">
                 <button class="secondary" id="cancel-scan-btn">
