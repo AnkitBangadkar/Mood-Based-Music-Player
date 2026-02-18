@@ -1,87 +1,177 @@
-# SoulSeek: AI Mood Based Music Player
+# SoulSeek: AI-Powered Mood Playlist Generator
 
-A local-first, AI-powered music player that generates playlists based on natural language mood descriptions.
+A local-first, privacy-focused music player that generates intelligent playlists from natural language mood queries using a multi-signal ensemble approach.
 
 ![SoulSeek Showcase](showcase.png)
 
 ## Features
 
-- **Natural Language Playlist Generation**: Describe your mood (e.g., "Sad songs for a rainy day", "High energy workout music", "Chill vibes but not too slow") and get a perfectly matched playlist
-- **Multi-Signal AI Scoring**: Combines semantic embeddings, audio features, genre matching, and lyrics emotion analysis for accurate recommendations
-- **Comprehensive Audio Analysis**:
-  - BPM detection with octave correction
-  - Energy, brightness, and dynamic range
-  - Musical key and mode (Major/Minor)
-  - Valence (happy/sad) and arousal (calm/energetic)
-  - MFCCs and spectral features
-- **Lyrics Integration**: Automatically fetches lyrics and analyzes emotional content using AI
-- **Negation Support**: Queries like "sad but not slow" or "energetic but not aggressive" work intelligently
-- **Privacy Focused**: Runs entirely locally. Your music and data never leave your machine
-- **Modern Interface**: Clean, glassmorphic dark UI with full audio player controls
+- **Natural Language Queries**: Describe your mood in plain English - "sad songs for a rainy day", "hype workout music", "chill but not sleepy"
+- **Multi-Signal Ensemble Scoring**: Combines three signals for accurate recommendations:
+  - **Semantic Similarity (40%)** - BGE embeddings match your query to song mood descriptions
+  - **Audio Feature Matching (46%)** - Gaussian similarity on 20+ extracted features
+  - **Genre Detection (14%)** - Keyword-based genre matching
+- **Comprehensive Audio Analysis** via Librosa:
+  - Tempo (BPM) with octave correction
+  - Musical key & mode (Krumhansl-Kessler algorithm)
+  - Valence (-1 sad to +1 happy) and Arousal (0 calm to 1 energetic)
+  - MFCCs, spectral centroid/rolloff/bandwidth
+  - RMS energy, dynamic range, zero-crossing rate
+- **Negation Support**: Queries like "happy but not energetic" intelligently exclude unwanted traits
+- **Query Expansion**: 70+ synonym mappings - "gym" → ["energetic", "workout", "hype"]
+- **Incremental Indexing**: Embeddings stored in SQLite - rescan without re-encoding
+- **100% Offline**: Your music and queries never leave your machine
 
 ## Tech Stack
 
-- **Backend**: FastAPI, SQLite
-- **AI/ML**: 
-  - Sentence-Transformers (`all-mpnet-base-v2`) for semantic matching
-  - HuggingFace (`j-hartmann/emotion-english-distilroberta-base`) for lyrics emotion
-  - Librosa for audio feature extraction
-- **Frontend**: Vanilla JavaScript, CSS with glassmorphism design
-- **Audio**: HTML5 Audio API with range request support
+| Layer | Technology |
+|-------|------------|
+| **Backend** | FastAPI, SQLite, Uvicorn |
+| **Embeddings** | BAAI/bge-base-en-v1.5 (768-dim) |
+| **Audio Analysis** | Librosa, NumPy, SciPy |
+| **Metadata** | Mutagen (ID3, Vorbis, MP4) |
+| **Frontend** | Vanilla JS, CSS (glassmorphism) |
+| **Icons** | Lucide (offline) |
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- A folder with music files (.mp3, .flac, .wav, .m4a, .ogg)
+- Python 3.9+
+- ~4GB disk space (for ML models)
+- Music files (.mp3, .flac, .wav, .m4a, .ogg)
 
-### Installation
+### Using the Launcher Script
 
-1. Clone the repository
-   ```bash
-   git clone https://github.com/AnkitBangadkar/Mood-Based-Music-Player.git
-   cd soulseek
-   ```
+```bash
+# Clone
+git clone https://github.com/AnkitBangadkar/Mood-Based-Music-Player.git
+cd Mood-Based-Music-Player
 
-2. Create and activate a virtual environment
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   # or
-   venv\Scripts\activate     # Windows
-   ```
+# Run
+./start.sh        # Linux/Mac
+start.bat         # Windows
+```
 
-3. Install dependencies
-   ```bash
-   pip install -r requirements.txt
-   ```
+The script automatically:
+- Creates a virtual environment (first run)
+- Installs dependencies (first run)
+- Activates venv and starts the server
 
-### Usage
+### Manual Installation
 
-1. Start the server
-   ```bash
-   python main.py
-   ```
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+python main.py
+```
 
-2. Open `http://localhost:8000` in your browser
+Open http://localhost:8000 in your browser.
 
-3. Click **Scan Library** and enter the absolute path to your music folder
+1. Click **Scan Library** → enter path to your music folder
+2. Wait for indexing (analyzes audio, builds embeddings)
+3. Type a mood query → **Generate Playlist**
 
-4. Wait for the scan to complete (analyzes audio features, fetches lyrics, builds embeddings)
+## Architecture
 
-5. Type a mood description and click **Generate Playlist**
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  User Query │ ──► │ Query Processor  │ ──► │ Ensemble Scorer │
+└─────────────┘     │  • Expansion     │     │  (40/46/14%)    │
+                    │  • BGE Encoding  │     └────────┬────────┘
+                    └──────────────────┘              │
+                                                      ▼
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ Audio Files │ ──► │ Indexing Phase   │ ──► │  Ranked Results │
+└─────────────┘     │  • Librosa feat. │     └─────────────────┘
+                    │  • BGE embedding │
+                    │  • SQLite store  │
+                    └──────────────────┘
+```
 
-## How It Works
+## How Scoring Works
 
-The playlist generation uses a weighted ensemble scoring system:
+### Semantic Similarity (40%)
+- Query and song descriptions encoded with BGE-base-en-v1.5
+- Cosine similarity between 768-dim vectors
+- Query prefix: `"Represent this sentence for searching relevant passages:"`
+- Song prefix: `"Represent this passage for retrieval:"`
 
-| Signal | Weight | Description |
-|--------|--------|-------------|
-| Semantic Similarity | 35% | Matches your query to song mood descriptions using sentence embeddings |
-| Audio Features | 40% | Gaussian matching for BPM, energy, valence, brightness, etc. |
-| Genre Matching | 12% | Keyword-based genre detection and matching |
-| Lyrics Emotion | 13% | AI emotion classification of song lyrics |
+### Audio Feature Matching (46%)
+- Each mood maps to target (valence, arousal, BPM, energy, etc.)
+- Gaussian similarity: `exp(-(x - target)² / (2σ²))`
+- Sigma values tuned per feature (see `constants.py`)
+
+### Genre Matching (14%)
+- Genre extracted from metadata keywords
+- Binary match scoring against query genre hints
+
+## Project Structure
+
+```
+├── main.py              # FastAPI app, routes, scan endpoint
+├── engine.py            # Core scoring logic, query processing
+├── scanner.py           # Library scanning, embedding storage
+├── analyzer.py          # Audio feature extraction (Librosa)
+├── database.py          # SQLite operations, embedding storage
+├── profiles.py          # Mood profiles, synonyms, genre keywords
+├── constants.py         # Weights, sigma values, thresholds
+├── lyrics_extractor.py  # Lyrics fetching (optional)
+├── sentiment.py         # Emotion classification (optional)
+├── static/
+│   ├── index.html       # Main UI
+│   ├── app.js           # Frontend logic
+│   ├── style.css        # Glassmorphism styles
+│   └── lucide.js        # Icons (offline)
+└── presentation/        # PBL presentation slides
+```
+
+## Mood Profiles
+
+Built-in profiles for 20+ moods with target audio features:
+
+| Mood | Valence | Arousal | BPM Range |
+|------|---------|---------|-----------|
+| happy | +0.58 | high | 110-140 |
+| sad | -0.62 | low | 60-90 |
+| energetic | neutral | high | 130-180 |
+| calm | neutral | low | 60-90 |
+| angry | -0.35 | high | 120-160 |
+| romantic | +0.35 | low | 70-100 |
+| bittersweet | +0.15 | medium | 80-110 |
+| anthemic | +0.45 | high | 100-140 |
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Main UI |
+| `/generate` | POST | Generate playlist from query |
+| `/scan` | POST | Start library scan |
+| `/scan/status` | GET | Get scan progress |
+| `/scan/folders` | GET | List indexed folders |
+| `/library/flush` | POST | Clear library |
+| `/audio/{id}` | GET | Stream audio file |
+
+## Configuration
+
+Key parameters in `constants.py`:
+
+```python
+W_SEMANTIC = 0.40    # Semantic weight
+W_FEATURES = 0.46    # Audio features weight
+W_GENRE = 0.14       # Genre weight
+SIGMA_BPM = 25       # BPM matching strictness
+SIGMA_VALENCE = 0.5  # Valence matching strictness
+```
+
+## Performance
+
+- **Indexing**: ~1.6 songs/second (audio extraction bottleneck)
+- **Query latency**: ~15ms (pre-computed embeddings)
+- **Precision@5**: 75% on test queries
 
 ## License
 
