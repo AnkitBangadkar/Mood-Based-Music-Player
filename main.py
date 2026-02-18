@@ -65,6 +65,8 @@ class SongResponse(BaseModel):
     duration: Optional[float] = None
     has_lyrics: Optional[bool] = None
     score: Optional[float] = None
+    semantic_score: Optional[float] = None
+    match_quality: Optional[str] = None
 
 
 class PlaylistSaveRequest(BaseModel):
@@ -73,12 +75,25 @@ class PlaylistSaveRequest(BaseModel):
 
 
 def _format_song_response(
-    song, score: Optional[float] = None, include_duration: bool = False
+    song,
+    score: Optional[float] = None,
+    semantic_score: Optional[float] = None,
+    include_duration: bool = False,
 ) -> dict:
     """Helper to format song response consistently across endpoints."""
     # Convert sqlite3.Row to dict if needed
     if hasattr(song, "keys"):
         song = dict(song)
+
+    # Determine match quality based on absolute score
+    match_quality = "unknown"
+    if score is not None:
+        if score >= 60:
+            match_quality = "high"
+        elif score >= 35:
+            match_quality = "medium"
+        else:
+            match_quality = "low"
 
     response = {
         "id": song["id"],
@@ -93,6 +108,8 @@ def _format_song_response(
         "arousal": song.get("arousal"),
         "has_lyrics": bool(song.get("has_lyrics")),
         "score": float(score) if score is not None else None,
+        "semantic_score": float(semantic_score) if semantic_score is not None else None,
+        "match_quality": match_quality,
     }
 
     if include_duration:
@@ -255,11 +272,17 @@ def generate_playlist(request: GenerateRequest):
     results = engine.search(request.prompt, limit=request.limit or 20)
 
     response = []
-    for song_id, score in results:
+    for item in results:
+        song_id, score, semantic_score = item
         song = database.get_song_by_id(song_id)
         if song:
             response.append(
-                _format_song_response(song, score=score, include_duration=True)
+                _format_song_response(
+                    song,
+                    score=score,
+                    semantic_score=semantic_score,
+                    include_duration=True,
+                )
             )
 
     return response

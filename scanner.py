@@ -5,6 +5,7 @@ Only processes new/modified files, skips unchanged ones.
 
 import os
 import json
+import re
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
@@ -25,6 +26,49 @@ import config
 log = get_logger("Scanner")
 
 SUPPORTED_EXTS = {".mp3", ".flac", ".wav", ".m4a", ".ogg"}
+
+
+def clean_title_for_embedding(title):
+    """
+    Clean song title for embedding by removing noise while keeping useful info.
+
+    Removes:
+    - Leading track numbers (e.g., "01. ", "2 - ", "03 ")
+    - Bracketed/parenthetical metadata (e.g., "(Live)", "[Remix]")
+    - Common audio quality tags (e.g., "(Official Audio)", "[HQ]")
+
+    Preserves:
+    - Featured artists (feat./ft./featuring)
+    - Version indicators that might affect mood (Acoustic, Remix sometimes)
+    - Actual song title content
+    """
+    if not title:
+        return ""
+
+    import re
+
+    # Remove leading track numbers (various formats)
+    # Matches: "01. Title", "2 - Title", "03 Title", "1) Title"
+    title = re.sub(r"^(\d+[\.\)\-\s]+)\s*", "", title.strip())
+
+    # Remove common metadata tags in parentheses/brackets
+    # These are usually audio quality/source indicators, not mood-relevant
+    metadata_patterns = [
+        r"\s*\(\s*(?:Official\s*)?(?:Audio|Video|Lyrics?|Visual|Visualizer)\s*\)",
+        r"\s*\[\s*(?:Official\s*)?(?:Audio|Video|Lyrics?|Visual|Visualizer)\s*\]",
+        r"\s*\(\s*(?:HD|HQ|High\s*Quality|4K|1080p)\s*\)",
+        r"\s*\[\s*(?:HD|HQ|High\s*Quality|4K|1080p)\s*\]",
+        r'\s*\(\s*(?:From\s+"[^"]+"|From\s+[^)]+)\s*\)',  # "(From Movie Name)"
+        r'\s*\[\s*(?:From\s+"[^"]+"|From\s+[^\]]+)\s*\]',
+    ]
+
+    for pattern in metadata_patterns:
+        title = re.sub(pattern, "", title, flags=re.IGNORECASE)
+
+    # Clean up multiple spaces
+    title = re.sub(r"\s+", " ", title).strip()
+
+    return title
 
 
 def get_optimal_workers():
@@ -244,7 +288,10 @@ def build_mood_text(
     features = [s for s in [tempo_str, mode_str] if s]
     feature_str = ". ".join(features) + "." if features else ""
 
-    meta = f"{artist} - {title}"
+    # Clean title for embedding (remove track numbers, metadata tags)
+    # Keep original artist name as it provides genre hints
+    cleaned_title = clean_title_for_embedding(title)
+    meta = f"{artist} - {cleaned_title}"
 
     lyrics_part = ""
     if lyrics_snippet and len(lyrics_snippet) > 20:
@@ -404,6 +451,7 @@ def scan_library(
     enable_online_lyrics=False,
     force_rescan=False,
     progress_callback=None,
+    preserve_existing=True,
 ):
     """
     Incremental scan - only processes new or modified files.
@@ -417,6 +465,9 @@ def scan_library(
                 "current_file": str, # Current file name
                 "stage": str,       # "scanning", "embedding", "clap", "complete"
             }
+        preserve_existing: If True, don't delete songs from other folders when
+                          scanning a different directory. Allows adding multiple
+                          music folders without losing previous scans.
     """
     start_time = time.time()
     log.info(f"Starting scan: {directory_path}")
@@ -454,16 +505,28 @@ def scan_library(
         files_to_scan.append(filepath)
 
     # Find deleted files (in DB but not on disk)
+    # Only delete files that were in the current directory scope
     deleted_ids = []
-    for filepath, (song_id, _) in existing_songs.items():
-        if filepath not in all_files:
-            deleted_ids.append(song_id)
+    if not preserve_existing:
+        # Original behavior: delete anything not in current scan
+        for filepath, (song_id, _) in existing_songs.items():
+            if filepath not in all_files:
+                deleted_ids.append(song_id)
+    else:
+        # New behavior: only delete files that were in this directory but are now gone
+        # This allows scanning multiple different folders without losing data
+        abs_directory = os.path.abspath(directory_path)
+        for filepath, (song_id, _) in existing_songs.items():
+            # Only consider deleting if file was in the current scan directory
+            if filepath.startswith(abs_directory) and filepath not in all_files:
+                deleted_ids.append(song_id)
 
     if deleted_ids:
         database.delete_songs_by_ids(deleted_ids)
 
     log.info(
-        f"Found {len(all_files)} audio files. New/modified: {len(files_to_scan)}, Skipped: {skipped}, Deleted: {len(deleted_ids)}"
+        f"Found {len(all_files)} audio files. New/modified: {len(files_to_scan)}, Skipped: {skipped}, "
+        f"Deleted: {len(deleted_ids)} (preserve_existing={preserve_existing})"
     )
 
     existing_song_count = database.get_song_count()

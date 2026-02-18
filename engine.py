@@ -495,13 +495,14 @@ def search(query, limit=20):
         - negation_penalties
     )
 
-    # ─── STEP 8: Scale final scores to 0-100 range without re-normalizing ───
-    # The scores are already weighted combinations - just scale them
-    # Use raw max to determine scale factor
-    final_max = float(np.max(final_scores))
-    if final_max > 0.01:
-        # Scale to 0-100 while preserving absolute differences
-        final_scores = (final_scores / final_max) * 100
+    # ─── STEP 8: Scale to percentage and add semantic baseline ───
+    # Use fixed scale (max theoretical score is 1.0) instead of normalizing to max
+    # This ensures scores reflect absolute match quality, not just relative ranking
+    final_scores = np.clip(final_scores * 100, 0, 100)
+
+    # Also compute raw semantic similarity (0-100) for reference
+    # This is the unnormalized cosine similarity - the "ground truth" of semantic match
+    raw_semantic_pct = raw_similarities * 100
 
     # ─── STEP 9: Get top results ───
     top_indices = np.argsort(final_scores)[::-1][:limit]
@@ -510,6 +511,7 @@ def search(query, limit=20):
     for idx in top_indices:
         song_id = engine.ids[idx]
         score = float(final_scores[idx])
-        results.append((song_id, score))
+        semantic_score = float(raw_semantic_pct[idx])
+        results.append((song_id, score, semantic_score))
 
     return results

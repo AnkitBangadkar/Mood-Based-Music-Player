@@ -136,10 +136,6 @@ def analyze_track(filepath, duration=90, offset=15):
     harmonic, percussive = librosa.effects.hpss(y)
     harmonic_ratio = float(np.mean(np.abs(harmonic)) / (np.mean(np.abs(y)) + 1e-6))
 
-    # 8. Onset strength variance (rhythm regularity)
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-    onset_variance = float(np.var(onset_env))
-
     # === NEW PHASE 1 FEATURES ===
 
     # 9. MFCCs (13 coefficients) - THE most important music classification feature
@@ -188,7 +184,6 @@ def analyze_track(filepath, duration=90, offset=15):
         "spectral_contrast": round(spectral_contrast, 2),
         "zero_crossing": round(zero_crossing, 4),
         "harmonic_ratio": round(harmonic_ratio, 2),
-        "onset_variance": round(onset_variance, 4),
         "spectral_rolloff": round(spectral_rolloff, 1),
         "spectral_bandwidth": round(spectral_bandwidth, 1),
         "dynamic_range": round(dynamic_range, 2),

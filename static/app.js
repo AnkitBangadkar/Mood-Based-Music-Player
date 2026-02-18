@@ -298,6 +298,10 @@ document.addEventListener("DOMContentLoaded", () => {
             queue = songs; // Replace queue with new results
             currentIndex = 0;
             
+            // Check if top match is low quality
+            const topScore = songs.length > 0 ? songs[0].score : 0;
+            const hasLowConfidence = topScore !== null && topScore < 35;
+            
             // Calculate total duration
             const totalDuration = songs.reduce((acc, s) => acc + (s.duration || 0), 0);
             const totalMins = Math.floor(totalDuration / 60);
@@ -313,6 +317,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span><i data-lucide="clock"></i> ${totalMins} min total</span>
                 `;
                 songListEl.insertBefore(statsDiv, songListEl.firstChild);
+                
+                // Add low confidence warning if needed
+                if (hasLowConfidence) {
+                    const warningDiv = document.createElement("div");
+                    warningDiv.className = "low-confidence-warning";
+                    warningDiv.innerHTML = `
+                        <i data-lucide="alert-triangle"></i>
+                        <div>
+                            <strong>Low match confidence</strong>
+                            <p>Your library may not have songs matching "${prompt}". The best match scored only ${topScore.toFixed(0)}%.</p>
+                        </div>
+                    `;
+                    songListEl.insertBefore(warningDiv, songListEl.firstChild);
+                }
+                
                 lucide.createIcons();
                 
                 // Don't auto-play, just load first song
@@ -378,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="mood-badges">
                     ${valence !== null ? `<span class="mood-badge valence" title="Valence: ${valence}% (Sad ↔ Happy) - ${moodLabel}"><i data-lucide="heart"></i>${valence}%</span>` : '-'}
                 </div>
-                <span class="score">${song.score ? song.score.toFixed(0) + '%' : '-'}</span>
+                <span class="score ${song.match_quality || ''}" title="Semantic similarity: ${song.semantic_score ? song.semantic_score.toFixed(0) + '%' : 'N/A'}">${song.score ? song.score.toFixed(0) + '%' : '-'}</span>
                 <span class="duration">${formatTime(song.duration)}</span>
             `;
             div.addEventListener("click", () => loadSong(index));

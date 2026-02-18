@@ -1324,3 +1324,54 @@ input[type="text"]:focus {
     display: none;
   }
 }
+
+/* ============================================
+   MATCH QUALITY INDICATORS
+   ============================================ */
+
+.song-item .score {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.song-item .score.low {
+  color: #ff453a; /* Red for low match */
+}
+
+.song-item .score.medium {
+  color: #ff9f0a; /* Orange for medium match */
+}
+
+.song-item .score.high {
+  color: #30d158; /* Green for high match */
+}
+
+.low-confidence-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin: 0 0.5rem 0.5rem 0.5rem;
+  background: rgba(255, 159, 10, 0.1);
+  border: 1px solid rgba(255, 159, 10, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.low-confidence-warning i {
+  color: #ff9f0a;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.low-confidence-warning strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #ff9f0a;
+}
+
+.low-confidence-warning p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
