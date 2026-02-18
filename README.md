@@ -40,7 +40,7 @@ A local-first, AI-powered music player that generates playlists based on natural
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/soulseek.git
+   git clone https://github.com/AnkitBangadkar/Mood-Based-Music-Player.git
    cd soulseek
    ```
 
