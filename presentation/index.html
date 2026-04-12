@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PBL Presentation 2026 | SoulSeek</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #0c0a09;
+            color: #e7e5e4;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            scroll-behavior: smooth;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: #1c1917;
+            border-right: 1px solid #292524;
+            padding: 2rem 1.5rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #292524;
+        }
+        
+        .sidebar-logo-icon {
+            width: 48px;
+            height: 48px;
+            background: #f59e0b;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #0c0a09;
+        }
+        
+        .sidebar-nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1rem;
+            border-radius: 10px;
+            color: #a8a29e;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+        
+        .sidebar-nav a.active {
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        .sidebar-nav a i {
+            width: 20px;
+            text-align: center;
+        }
+        
+        .sidebar-footer {
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.75rem;
+            color: #57534e;
+        }
+        
+    /* Main Content Area */
+    .main-content {
+        margin-left: 280px;
+        padding: 3rem 4rem;
+        min-height: 100vh;
+    }
+    
+    /* Section spacing */
+    .main-content section {
+        margin-bottom: 6rem;
+    }
+        
+        /* Larger secondary text */
+        .text-slate-400 { color: #94a3b8; }
+        .text-slate-500 { color: #64748b; }
+        .text-sm { font-size: 1.125rem; }
+        .text-xs { font-size: 1rem; }
+        .text-\[10px\] { font-size: 0.75rem; }
+        .text-\[9px\] { font-size: 0.7rem; }
+        .text-\[11px\] { font-size: 0.8rem; }
+        
+        /* Map slate colors to stone for warmer feel */
+        .text-slate-400 { color: #a8a29e !important; }
+        .text-slate-500 { color: #78716c !important; }
+        .text-slate-300 { color: #d6d3d1 !important; }
+        .text-slate-200 { color: #e7e5e4 !important; }
+        .text-slate-600 { color: #57534e !important; }
+        
+        .border-slate-800 { border-color: #292524 !important; }
+        .border-slate-700 { border-color: #44403c !important; }
+        .border-slate-600 { border-color: #57534e !important; }
+        
+        .bg-slate-800\/30 { background: rgba(68, 64, 60, 0.3) !important; }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .gradient-text {
+            color: #f59e0b;
+        }
+        
+        .gradient-text-blue {
+            color: #d97706;
+        }
+        
+        .gradient-border {
+        }
+        
+        /* Animated Background */
+        .bg-grid {
+        }
+        
+        @keyframes flicker {
+            0%, 100% { background-color: #ffffff; }
+            50% { background-color: #fca5a5; }
+        }
+        
+        .timer-warning {
+            animation: flicker 1s infinite;
+            border: 3px solid #ef4444 !important;
+            color: #b91c1c !important;
+        }
+        
+        .timer-stop {
+            background-color: #991b1b !important;
+            color: #ffffff !important;
+            border: 3px solid #f87171 !important;
+            animation: none;
+        }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-fadeInUp {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+        
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+        .delay-400 { animation-delay: 0.4s; }
+        
+        /* Hover Effects */
+        .hover-lift {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* Architecture Diagram */
+        .arch-line {
+            stroke: #f59e0b;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 5,5;
+            animation: dash 20s linear infinite;
+        }
+        
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -100;
+            }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #020617;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        
+        /* Tech Stack Cards */
+        .tech-card {
+            transition: all 0.3s ease;
+        }
+        
+        .tech-card:hover {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        /* Feature Icons */
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background: rgba(245, 158, 11, 0.15);
+            margin-bottom: 1rem;
+        }
+        
+        /* Progress Bar */
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: #f59e0b;
+            transition: width 1s ease-out;
+        }
+        
+        /* Code Block */
+        .code-block {
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+        }
+        
+        .code-keyword { color: #c084fc; }
+        .code-string { color: #86efac; }
+        .code-comment { color: #64748b; }
+        .code-function { color: #60a5fa; }
+    </style>
+</head>
+<body onload="startTimer()">
+<!-- Timer -->
+    <div id="timerContainer" class="fixed bottom-10 right-10 px-8 py-4 rounded-3xl flex items-center gap-4 z-[9999]">
+        <i class="fas fa-hourglass-start text-amber-600 text-2xl" id="timerIcon"></i>
+        <span id="displayTime" class="text-4xl font-black font-mono tracking-tighter">00:00</span>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div>
+                <div class="font-bold text-white text-lg">SoulSeeker</div>
+                <div class="text-xs text-amber-500 uppercase tracking-wider">PBL 2026</div>
+            </div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#problem" class="active">
+                <i class="fas fa-exclamation-circle"></i>
+                Problem
+            </a>
+            <a href="#solution">
+                <i class="fas fa-lightbulb"></i>
+                Solution
+            </a>
+            <a href="#signals">
+                <i class="fas fa-layer-group"></i>
+                5 Signals
+            </a>
+            <a href="#arousal-valence">
+                <i class="fas fa-smile"></i>
+                Arousal/Valence
+            </a>
+            <a href="#methodology">
+                <i class="fas fa-sitemap"></i>
+                Architecture
+            </a>
+            <a href="#tech-stack">
+                <i class="fas fa-code"></i>
+                Tech Stack
+            </a>
+            <a href="#results">
+                <i class="fas fa-chart-bar"></i>
+                Results
+            </a>
+            <a href="#credits">
+                <i class="fas fa-award"></i>
+                Credits
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="text-center">
+                <div class="font-bold text-amber-500">Dept. of CSE</div>
+                <div>Manipal University Jaipur</div>
+                <div class="mt-2">2026</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Title Section -->
+        <section class="animate-fadeInUp">
+            <div class="inline-block px-4 py-1 border border-stone-700 rounded-full text-stone-500 text-xs font-mono mb-4 uppercase tracking-widest">PBL End Term Project</div>
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-4 uppercase leading-tight">
+                <span class="gradient-text">SoulSeeker</span>
+            </h1>
+            <p class="text-stone-400 max-w-2xl text-base leading-relaxed mb-6">
+                AI-powered mood-based music playlist generator using a 5-signal ensemble approach. Combines semantic embeddings (BGE), audio-text alignment (CLAP), Gaussian feature matching, genre detection, and lyrics emotion analysis - 100% offline.
+            </p>
+            <div class="flex flex-wrap gap-3 mb-8">
+                <span class="px-3 py-1.5 rounded-full border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                    <i class="fas fa-brain mr-1"></i>5 Signals
+                </span>
+                <span class="px-3 py-1.5 rounded-full border border-orange-500/30 text-orange-400 text-xs font-bold uppercase tracking-wider">
+                    <i class="fas fa-shield-alt mr-1"></i>Privacy-First
+                </span>
+                <span class="px-3 py-1.5 rounded-full border border-red-500/30 text-red-400 text-xs font-bold uppercase tracking-wider">
+                    <i class="fas fa-music mr-1"></i>Natural Language
+                </span>
+                <span class="px-3 py-1.5 rounded-full border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                    <i class="fas fa-microphone mr-1"></i>CLAP
+                </span>
+            </div>
+            
+            <!-- Demo Screenshot -->
+            <div class="max-w-4xl mx-auto">
+                <div class="glass rounded-2xl p-1 border border-stone-700/50">
+                    <img src="showcase.png" alt="Application Demo" class="rounded-xl w-full">
+                </div>
+                <p class="text-stone-500 text-sm mt-3">Figure 1: Application Interface</p>
+            </div>
+        </section>
+
+        <!-- Problem Statement -->
+        <section id="problem" class="animate-fadeInUp delay-100">
+            <h2 class="text-3xl font-black mb-10">Problem Statement</h2>
+            <div class="grid md:grid-cols-2 gap-12">
+                <div class="glass p-8 rounded-[2rem] border-l-4 border-amber-600 hover-lift">
+                    <div class="feature-icon mb-4">
+                        <i class="fas fa-exclamation-triangle text-amber-400 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-extrabold mb-4">The Challenge</h3>
+                    <p class="text-slate-400 leading-relaxed mb-4">
+                        Music listeners with large local libraries face a significant challenge: manually browsing thousands of songs by genre or artist is time-consuming and ineffective. Current music streaming services rely on cloud-based processing and user data collection, raising privacy concerns while offering limited control over recommendation algorithms.
+                    </p>
+                    <p class="text-slate-400 leading-relaxed mb-4">
+                        Existing solutions either:
+                    </p>
+                    <ul class="space-y-2 text-slate-400">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-times text-red-400 mt-1"></i>
+                            <span>Require cloud connectivity, compromising privacy</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-times text-red-400 mt-1"></i>
+                            <span>Use rigid genre-based categorization without mood understanding</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-times text-red-400 mt-1"></i>
+                            <span>Rely on collaborative filtering instead of audio content analysis</span>
+                        </li>
+                    </ul>
+                    <p class="text-slate-400 leading-relaxed mt-4">
+                        There is a need for a privacy-first, local-only solution that can understand natural language mood descriptions and analyze audio content to generate personalized playlists.
+                    </p>
+                </div>
+                <div class="space-y-6">
+                    <div class="glass p-7 rounded-3xl border-r-4 border-amber-500/50 hover-lift">
+                        <h3 class="text-amber-400 font-bold text-xs uppercase tracking-widest mb-3">
+                            <i class="fas fa-book mr-2"></i>Literature Review
+                        </h3>
+                        <p class="text-lg text-slate-300 leading-relaxed mb-4">
+                            Our approach is grounded in established music cognition and MIR research:
+                        </p>
+                        <ul class="space-y-3 text-slate-400 text-base">
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-amber-400 mt-1"></i>
+                                <span><strong class="text-slate-200">Thayer's 2D Mood Model</strong> - Arousal-Valence plane for mapping emotional states</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-amber-400 mt-1"></i>
+                                <span><strong class="text-slate-200">Krumhansl-Kessler Profiles</strong> - Music cognition research for key detection from audio</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-amber-400 mt-1"></i>
+                                <span><strong class="text-slate-200">MFCC & Spectral Analysis</strong> - Standard MIR features for timbre and texture</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-amber-400 mt-1"></i>
+                                <span><strong class="text-slate-200">Sentence-Transformers</strong> - Semantic embeddings for natural language mood queries</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-amber-400 mt-1"></i>
+                                <span><strong class="text-slate-200">CLAP Audio-Text Alignment</strong> - Direct audio-to-text similarity using contrastive learning</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="glass p-7 rounded-3xl border-r-4 border-orange-500/50 hover-lift">
+                        <h3 class="text-orange-400 font-bold text-xs uppercase tracking-widest mb-3">
+                            <i class="fas fa-lightbulb mr-2"></i>Research Gap & Innovation
+                        </h3>
+                        <p class="text-lg text-slate-300 leading-relaxed">
+                            <strong class="text-slate-200">Our innovation:</strong> A local-first, 5-signal ensemble that combines BGE semantic embeddings, CLAP audio-text alignment, Gaussian feature profile matching, genre keyword detection, and transformer-based lyrics emotion analysis. Uses the 2D Valence-Arousal quadrant system - entirely offline with 0% cloud dependency.
+                        </p>
+                    </div>
+                    <div class="glass p-7 rounded-3xl border-r-4 border-amber-500/50 hover-lift">
+                        <h3 class="text-amber-400 font-bold text-xs uppercase tracking-widest mb-3">
+                            <i class="fas fa-users mr-2"></i>Target Users
+                        </h3>
+                        <p class="text-base text-slate-400 leading-relaxed">
+                            Privacy-conscious music enthusiasts, Users with large local libraries, Music enthusiasts wanting a free mood-based playlist generator, Users facing selection anxiety, Students wanting focus music, and party hosts needing vibe-appropriate selections.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Solution Overview -->
+        <section id="solution" class="animate-fadeInUp delay-200">
+            <h2 class="text-3xl font-black mb-10">Our Solution</h2>
+            <div class="glass p-12 rounded-[3.5rem] border-t-4 border-amber-500 mb-12">
+                <div class="text-center mb-12">
+                    <h3 class="text-2xl font-bold mb-4">How It Works</h3>
+                    <p class="text-slate-400 max-w-2xl mx-auto">
+                        From audio file to search result in two phases - indexing and retrieval
+                    </p>
+                </div>
+                
+                <!-- Two Phase Process -->
+                <div class="grid md:grid-cols-2 gap-8 mb-12">
+                    <!-- Indexing Phase -->
+                    <div class="text-center">
+                        <div class="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-database text-3xl text-amber-400"></i>
+                        </div>
+                        <h4 class="font-bold text-2xl mb-4 text-amber-400">Indexing Phase</h4>
+                        <div class="space-y-4 text-base text-left max-w-md mx-auto">
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-amber-400 font-mono text-sm bg-amber-500/20 px-3 py-1 rounded">1</span>
+                                <span class="text-slate-200">Audio features extracted <span class="text-slate-400">(BPM, valence, MFCCs...)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-amber-400 font-mono text-sm bg-amber-500/20 px-3 py-1 rounded">2</span>
+                                <span class="text-slate-200">Mood description generated <span class="text-slate-400">(valence-arousal mapping)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-amber-400 font-mono text-sm bg-amber-500/20 px-3 py-1 rounded">3</span>
+                                <span class="text-slate-200">Embeddings generated <span class="text-slate-400">(BGE 768-dim + CLAP 768-dim)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-amber-400 font-mono text-sm bg-amber-500/20 px-3 py-1 rounded">4</span>
+                                <span class="text-slate-200">Lyrics emotion analyzed <span class="text-slate-400">(DistilRoBERTa 7-class)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-amber-400 font-mono text-sm bg-amber-500/20 px-3 py-1 rounded">5</span>
+                                <span class="text-slate-200">Stored in SQLite database <span class="text-slate-400">(ready for search)</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Search Phase -->
+                    <div class="text-center">
+                        <div class="w-20 h-20 rounded-full bg-orange-500/20 border-2 border-orange-500 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-search text-3xl text-orange-400"></i>
+                        </div>
+                        <h4 class="font-bold text-2xl mb-4 text-orange-400">Search Phase</h4>
+                        <div class="space-y-4 text-base text-left max-w-md mx-auto">
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-orange-400 font-mono text-sm bg-orange-500/20 px-3 py-1 rounded">1</span>
+                                <span class="text-slate-200">User query: <span class="text-yellow-300 font-semibold">"sad rainy night"</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-orange-400 font-mono text-sm bg-orange-500/20 px-3 py-1 rounded">2</span>
+                                <span class="text-slate-200">Query encoded <span class="text-slate-400">(BGE + CLAP text)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-orange-400 font-mono text-sm bg-orange-500/20 px-3 py-1 rounded">3</span>
+                                <span class="text-slate-200">5-signal ensemble scoring <span class="text-slate-400">(22+30+25+10+13%)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-orange-400 font-mono text-sm bg-orange-500/20 px-3 py-1 rounded">4</span>
+                                <span class="text-slate-200">Dynamic weight adjustment <span class="text-slate-400">(query-adaptive)</span></span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
+                                <span class="text-orange-400 font-mono text-sm bg-orange-500/20 px-3 py-1 rounded">5</span>
+                                <span class="text-slate-200">Results ranked by score <span class="text-slate-400">(top matches)</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Example Match -->
+                <div class="p-5 bg-stone-800/30 rounded-xl border border-amber-500/20 text-center">
+                    <p class="text-lg text-slate-200">
+                        <i class="fas fa-lightbulb text-yellow-400 mr-2"></i>
+                        <strong>Example:</strong> Query <span class="text-yellow-300 font-semibold">"sad rainy night"</span> vs Song 
+                        <span class="text-orange-300 font-semibold">"low valence (-0.62), low arousal (0.28), minor key"</span> - 
+                        <span class="text-amber-400 font-bold text-xl">Similarity: 0.89</span>
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5 Signal Ensemble -->
+        <section id="signals" class="animate-fadeInUp">
+            <h2 class="text-3xl font-black mb-8">The 5-Signal Ensemble</h2>
+            <p class="text-slate-400 text-center max-w-3xl mx-auto mb-16 text-lg">
+                Our system combines five complementary scoring mechanisms for comprehensive mood understanding
+            </p>
+            <div class="grid md:grid-cols-5 gap-4 mb-12">
+                <div class="glass p-6 rounded-2xl text-center hover-lift border-t-4 border-amber-500">
+                    <div class="w-14 h-14 rounded-xl bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-brain text-amber-400 text-2xl"></i>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">1. Semantic</h4>
+                    <p class="text-amber-400 font-black text-2xl mb-2">22%</p>
+                    <p class="text-xs text-slate-400">BGE embeddings<br>(768-dim)</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift border-t-4 border-orange-500">
+                    <div class="w-14 h-14 rounded-xl bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-wave-square text-orange-400 text-2xl"></i>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">2. CLAP</h4>
+                    <p class="text-orange-400 font-black text-2xl mb-2">30%</p>
+                    <p class="text-xs text-slate-400">Audio-text alignment<br>(768-dim)</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift border-t-4 border-red-500">
+                    <div class="w-14 h-14 rounded-xl bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-sliders-h text-red-400 text-2xl"></i>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">3. Features</h4>
+                    <p class="text-red-400 font-black text-2xl mb-2">25%</p>
+                    <p class="text-xs text-slate-400">Gaussian profile<br>(17 features)</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift border-t-4 border-amber-600">
+                    <div class="w-14 h-14 rounded-xl bg-amber-600/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-tags text-amber-600 text-2xl"></i>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">4. Genre</h4>
+                    <p class="text-amber-600 font-black text-2xl mb-2">10%</p>
+                    <p class="text-xs text-slate-400">Keyword matching<br>(20 categories)</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift border-t-4 border-yellow-500">
+                    <div class="w-14 h-14 rounded-xl bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-heart text-yellow-400 text-2xl"></i>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">5. Emotion</h4>
+                    <p class="text-yellow-400 font-black text-2xl mb-2">13%</p>
+                    <p class="text-xs text-slate-400">Lyrics analysis<br>(7 emotions)</p>
+                </div>
+            </div>
+
+            <!-- Dynamic Weight Adjustment -->
+            <div class="glass p-8 rounded-2xl border border-amber-500/30">
+                <h3 class="text-xl font-bold text-center mb-6">
+                    <i class="fas fa-adjust text-amber-400 mr-2"></i>Dynamic Weight Adjustment
+                </h3>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                        <h4 class="text-orange-400 font-bold mb-3">Emotion-Dominant Queries</h4>
+                        <p class="text-sm text-slate-400 mb-3">Queries like "angry", "heartbreak", "romantic"</p>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-amber-400">CLAP + Emotion</span>
+                            <span class="text-white">boosted 1.4x</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Features</span>
+                            <span class="text-white">reduced 0.7x</span>
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        <h4 class="text-amber-400 font-bold mb-3">Acoustic-Dominant Queries</h4>
+                        <p class="text-sm text-slate-400 mb-3">Queries like "epic", "cinematic", "calm"</p>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-amber-400">Features</span>
+                            <span class="text-white">boosted 1.4x</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">CLAP + Emotion</span>
+                            <span class="text-white">reduced 0.7x</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Arousal-Valence Model -->
+        <section id="arousal-valence" class="animate-fadeInUp">
+            <h2 class="text-3xl font-black mb-8">Thayer's Emotion Model</h2>
+            <p class="text-slate-400 text-center max-w-3xl mx-auto mb-12 text-lg">
+                Our system maps moods to a 2D plane based on Russell's circumplex model: 
+                <strong class="text-amber-400">Arousal</strong> (energy level) vs <strong class="text-orange-400">Valence</strong> (happiness)
+            </p>
+            
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="glass p-6 rounded-[2.5rem]">
+                    <svg viewBox="0 0 400 420" class="w-full h-auto">
+                        <!-- Background quadrants with gradients -->
+                        <defs>
+                            <linearGradient id="q1" x1="0%" y1="100%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#22c55e;stop-opacity:0.08" />
+                                <stop offset="100%" style="stop-color:#22c55e;stop-opacity:0.02" />
+                            </linearGradient>
+                            <linearGradient id="q2" x1="0%" y1="100%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:0.08" />
+                                <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:0.02" />
+                            </linearGradient>
+                            <linearGradient id="q3" x1="0%" y1="100%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.08" />
+                                <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.02" />
+                            </linearGradient>
+                            <linearGradient id="q4" x1="0%" y1="100%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.08" />
+                                <stop offset="100%" style="stop-color:#ef4444;stop-opacity:0.02" />
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Quadrant backgrounds -->
+                        <rect x="40" y="50" width="160" height="160" fill="url(#q1)" rx="8"/>
+                        <rect x="200" y="50" width="160" height="160" fill="url(#q2)" rx="8"/>
+                        <rect x="40" y="210" width="160" height="160" fill="url(#q3)" rx="8"/>
+                        <rect x="200" y="210" width="160" height="160" fill="url(#q4)" rx="8"/>
+                        
+                        <!-- Quadrant labels (subtle) -->
+                        <text x="120" y="80" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="600" opacity="0.5">CALM</text>
+                        <text x="280" y="80" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600" opacity="0.5">EXCITED</text>
+                        <text x="120" y="350" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="600" opacity="0.5">SAD</text>
+                        <text x="280" y="350" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="600" opacity="0.5">ANGRY</text>
+                        
+                        <!-- Axes -->
+                        <line x1="40" y1="210" x2="360" y2="210" stroke="#ffffff20" stroke-width="1"/>
+                        <line x1="200" y1="50" x2="200" y2="370" stroke="#ffffff20" stroke-width="1"/>
+                        
+                        <!-- Axis arrows and labels -->
+                        <polygon points="200,48 196,58 204,58" fill="#3b82f6" opacity="0.6"/>
+                        <polygon points="200,372 196,362 204,362" fill="#3b82f6" opacity="0.6"/>
+                        <polygon points="362,210 352,206 352,214" fill="#a855f7" opacity="0.6"/>
+                        <polygon points="38,210 48,206 48,214" fill="#a855f7" opacity="0.6"/>
+                        
+                        <text x="200" y="28" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="bold" opacity="0.7">HIGH AROUSAL</text>
+                        <text x="200" y="400" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="bold" opacity="0.7">LOW AROUSAL</text>
+                        <text x="380" y="205" fill="#a855f7" font-size="9" font-weight="bold" opacity="0.7" transform="rotate(90 380 205)">POSITIVE</text>
+                        <text x="20" y="205" fill="#a855f7" font-size="9" font-weight="bold" opacity="0.7" transform="rotate(-90 20 205)">NEGATIVE</text>
+                        
+                        <!-- Mood points (10 diverse moods) - sleek dots with centered labels below -->
+                        <!-- EXCITED quadrant -->
+                        <circle cx="300" cy="110" r="5" fill="#fbbf24"/>
+                        <text x="300" y="126" text-anchor="middle" fill="#fbbf24" font-size="10">happy</text>
+                        
+                        <circle cx="260" cy="75" r="5" fill="#f97316"/>
+                        <text x="260" y="91" text-anchor="middle" fill="#f97316" font-size="10">party</text>
+                        
+                        <!-- CALM quadrant -->
+                        <circle cx="110" cy="110" r="5" fill="#22c55e"/>
+                        <text x="110" y="126" text-anchor="middle" fill="#22c55e" font-size="10">peaceful</text>
+                        
+                        <circle cx="155" cy="145" r="5" fill="#4ade80"/>
+                        <text x="155" y="161" text-anchor="middle" fill="#4ade80" font-size="10">romantic</text>
+                        
+                        <!-- SAD quadrant -->
+                        <circle cx="90" cy="310" r="5" fill="#3b82f6"/>
+                        <text x="90" y="326" text-anchor="middle" fill="#3b82f6" font-size="10">sad</text>
+                        
+                        <circle cx="145" cy="285" r="5" fill="#60a5fa"/>
+                        <text x="145" y="301" text-anchor="middle" fill="#60a5fa" font-size="10">melancholy</text>
+                        
+                        <!-- ANGRY quadrant -->
+                        <circle cx="290" cy="310" r="5" fill="#ef4444"/>
+                        <text x="290" y="326" text-anchor="middle" fill="#ef4444" font-size="10">angry</text>
+                        
+                        <circle cx="315" cy="265" r="5" fill="#f87171"/>
+                        <text x="315" y="281" text-anchor="middle" fill="#f87171" font-size="10">intense</text>
+                        
+                        <!-- On axes -->
+                        <circle cx="200" cy="85" r="5" fill="#ea580c"/>
+                        <text x="200" y="101" text-anchor="middle" fill="#ea580c" font-size="10">energetic</text>
+                        
+                        <circle cx="135" cy="210" r="5" fill="#7c3aed"/>
+                        <text x="135" y="226" text-anchor="middle" fill="#7c3aed" font-size="10">dark</text>
+                    </svg>
+                    <p class="text-slate-500 text-center mt-4 text-sm">Figure 4: Mood positions on the Arousal-Valence plane</p>
+                </div>
+                    <div class="space-y-6">
+                    <div class="glass p-6 rounded-2xl hover-lift border-l-4 border-amber-500">
+                        <h4 class="font-bold text-xl mb-3"><i class="fas fa-arrow-up mr-2 text-amber-400"></i>Arousal Axis (Y)</h4>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            Represents energy/excitement level from <strong class="text-amber-300">0 (calm/sleepy)</strong> to 
+                            <strong class="text-amber-300">1 (energetic/intense)</strong>. Determined by BPM, RMS energy, and spectral bandwidth.
+                        </p>
+                    </div>
+                    <div class="glass p-6 rounded-2xl hover-lift border-l-4 border-orange-500">
+                        <h4 class="font-bold text-xl mb-3"><i class="fas fa-smile mr-2 text-orange-400"></i>Valence Axis (X)</h4>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            Represents emotional positivity from <strong class="text-orange-300">-1 (sad/negative)</strong> to 
+                            <strong class="text-orange-300">+1 (happy/positive)</strong>. Derived from musical mode (Major=happy), tempo, brightness, and spectral contrast.
+                        </p>
+                    </div>
+                    <div class="glass p-6 rounded-2xl hover-lift border-l-4 border-amber-600">
+                        <h4 class="font-bold text-xl mb-3"><i class="fas fa-crosshairs mr-2 text-amber-600"></i>How It Works</h4>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            Each mood query maps to a target (arousal, valence) point. Songs are scored using 
+                            <strong class="text-amber-300">Gaussian similarity</strong> - closer matches get higher scores.
+                        </p>
+                    </div>
+                    <div class="glass p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                        <h4 class="font-bold text-amber-400 mb-3 text-lg">Example Queries</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="flex items-center gap-3">
+                                <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+                                <span class="text-slate-300">"party" - High Arousal, High Valence</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-3 h-3 rounded-full bg-blue-400"></span>
+                                <span class="text-slate-300">"sad songs" - Low Arousal, Low Valence</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-3 h-3 rounded-full bg-green-400"></span>
+                                <span class="text-slate-300">"calm study" - Low Arousal, Neutral Valence</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                                <span class="text-slate-300">"angry metal" - High Arousal, Low Valence</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-3 h-3 rounded-full bg-purple-400"></span>
+                                <span class="text-slate-300">"bittersweet" - Mixed Valence</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="w-3 h-3 rounded-full bg-orange-400"></span>
+                                <span class="text-slate-300">"night drive" - Medium Arousal</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Methodology -->
+        <section id="methodology" class="space-y-12 animate-fadeInUp delay-300">
+            <h2 class="text-3xl font-black mb-8">System Architecture</h2>
+            
+            <!-- Architecture Diagrams -->
+            <div class="space-y-8">
+                <div class="glass p-6 rounded-[2rem] border border-slate-700/50">
+                    <img src="diagrams/flowchart.png" alt="System Flow Chart" class="rounded-xl w-full">
+                    <p class="text-stone-500 text-sm mt-4 text-center">Figure 2: Complete System Flow - From Audio Input to Playlist Output</p>
+                </div>
+                <div class="glass p-6 rounded-[2rem] border border-slate-700/50">
+                    <img src="diagrams/data_flow_diagram.png" alt="Data Flow Diagram" class="rounded-xl w-full">
+                    <p class="text-stone-500 text-sm mt-4 text-center">Figure 3: Data Flow Diagram - Indexing & Retrieval Pipelines</p>
+                </div>
+            </div>
+
+            <!-- Three Pillars -->
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="glass p-8 rounded-3xl text-center hover-lift">
+                    <i class="fas fa-database text-amber-500 text-3xl mb-4"></i>
+                    <h3 class="font-bold mb-2 uppercase text-xs tracking-widest">Dataset & Input</h3>
+                    <p class="text-base text-slate-400 mb-4">Local music library (.mp3, .flac, .wav, .m4a)</p>
+                    <div class="text-left space-y-2 text-sm text-slate-400">
+                        <div class="flex justify-between">
+                            <span>Audio Analysis:</span>
+                            <span class="text-amber-400">Librosa</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Metadata:</span>
+                            <span class="text-amber-400">Mutagen</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass p-8 rounded-3xl text-center hover-lift">
+                    <i class="fas fa-microchip text-orange-500 text-3xl mb-4"></i>
+                    <h3 class="font-bold mb-2 uppercase text-xs tracking-widest">Model & Architecture</h3>
+                    <p class="text-base text-slate-400 mb-4">5-Signal Ensemble Engine</p>
+                    <div class="text-left space-y-2 text-sm text-slate-400">
+                         <div class="flex justify-between">
+                            <span>Embeddings:</span>
+                            <span class="text-orange-400">BGE-base-en-v1.5</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Audio:</span>
+                            <span class="text-orange-400">CLAP 768-dim</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Backend:</span>
+                            <span class="text-orange-400">FastAPI</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass p-8 rounded-3xl text-center border-2 border-amber-500/20 bg-amber-500/5 hover-lift">
+                    <i class="fab fa-python text-amber-500 text-3xl mb-4"></i>
+                    <h3 class="font-bold mb-4 uppercase text-xs tracking-widest text-amber-400">Project Repository</h3>
+                    <a href="https://github.com/AnkitBangadkar/Mood-Based-Music-Player" target="_blank" class="px-6 py-2 bg-amber-600 rounded-full text-[10px] font-black hover:bg-amber-500 transition shadow-lg shadow-amber-900/40 inline-block mb-4">
+                        <i class="fab fa-github mr-2"></i>VIEW CODE
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack -->
+        <section id="tech-stack" class="animate-fadeInUp">
+            <h2 class="text-3xl font-black mb-10">Technology Stack</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fab fa-python text-4xl text-yellow-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">Python</h4>
+                    <p class="text-sm text-slate-400 mt-1">Core Language</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-server text-4xl text-green-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">FastAPI</h4>
+                    <p class="text-sm text-slate-400 mt-1">Backend Framework</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-database text-4xl text-amber-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">SQLite</h4>
+                    <p class="text-sm text-slate-400 mt-1">Database</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-brain text-4xl text-amber-600 mb-3"></i>
+                    <h4 class="font-bold text-sm">BGE Embeddings</h4>
+                    <p class="text-sm text-slate-400 mt-1">Semantic (768-dim)</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-wave-square text-4xl text-orange-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">CLAP</h4>
+                    <p class="text-sm text-slate-400 mt-1">laion/clap-htsat-unfused</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-music text-4xl text-pink-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">Librosa</h4>
+                    <p class="text-sm text-slate-400 mt-1">Audio Analysis</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-robot text-4xl text-purple-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">Transformers</h4>
+                    <p class="text-sm text-slate-400 mt-1">Hugging Face</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fab fa-react text-4xl text-cyan-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">React</h4>
+                    <p class="text-sm text-slate-400 mt-1">Frontend UI</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-file-audio text-4xl text-orange-500 mb-3"></i>
+                    <h4 class="font-bold text-sm">Mutagen</h4>
+                    <p class="text-sm text-slate-400 mt-1">Metadata Extraction</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-heart text-4xl text-red-400 mb-3"></i>
+                    <h4 class="font-bold text-sm">Emotion RoBERTa</h4>
+                    <p class="text-sm text-slate-400 mt-1">Lyrics (7-class)</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fas fa-globe text-4xl text-green-500 mb-3"></i>
+                    <h4 class="font-bold text-sm">Lyrics APIs</h4>
+                    <p class="text-sm text-slate-400 mt-1">LRCLib/Genius/OVH</p>
+                </div>
+                <div class="tech-card glass p-6 rounded-2xl text-center">
+                    <i class="fab fa-js text-4xl text-yellow-300 mb-3"></i>
+                    <h4 class="font-bold text-sm">TypeScript</h4>
+                    <p class="text-sm text-slate-400 mt-1">Frontend</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <section id="results" class="glass p-12 rounded-[3.5rem] border-t-4 border-amber-500 animate-fadeInUp">
+            <h2 class="text-2xl font-black mb-8">Results & Analysis</h2>
+            <div class="grid md:grid-cols-2 gap-16 items-center">
+                <div class="h-80">
+                    <canvas id="resultsChart"></canvas>
+                </div>
+                <div class="space-y-6">
+                    <div class="p-6 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-slate-300 font-bold uppercase text-sm tracking-widest">Precision@5</span>
+                            <span class="text-amber-400 font-mono font-black text-3xl">75%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 75%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-2">Correct songs in top 5 results</p>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-slate-300 font-bold uppercase text-sm tracking-widest">Hit@5 Accuracy</span>
+                            <span class="text-green-400 font-mono font-black text-3xl">100%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 100%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-2">At least 1 relevant song in top 5</p>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-slate-300 font-bold uppercase text-sm tracking-widest">Indexing Speed</span>
+                            <span class="text-cyan-400 font-mono font-black text-3xl">1.6/s</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 80%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-2">~1.6 songs/second (227 songs in 145s)</p>
+                    </div>
+                    <p class="text-slate-500 text-sm italic text-justify leading-relaxed">
+                        Our 5-signal ensemble approach combines: Semantic (22%), CLAP (30%), Audio Features (25%), Genre (10%), Emotion (13%) for comprehensive mood understanding. Dynamic weight adjustment adapts to query type for optimal results.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Achievements -->
+        <section class="animate-fadeInUp">
+            <h2 class="text-3xl font-black mb-10">Key Achievements</h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-amber-400 mb-2">5</div>
+                    <h4 class="font-bold text-sm mb-1">Signal Sources</h4>
+                    <p class="text-sm text-slate-400">Semantic (22%), CLAP (30%), Features (25%), Genre (10%), Emotion (13%)</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-orange-400 mb-2">2D</div>
+                    <h4 class="font-bold text-sm mb-1">Valence-Arousal</h4>
+                    <p class="text-sm text-slate-400">Quadrant-based mood mapping</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-green-400 mb-2">0%</div>
+                    <h4 class="font-bold text-sm mb-1">Cloud Dependency</h4>
+                    <p class="text-sm text-slate-400">100% offline, privacy-first</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-amber-600 mb-2">K-K</div>
+                    <h4 class="font-bold text-sm mb-1">Key Detection</h4>
+                    <p class="text-sm text-slate-400">Krumhansl-Kessler profiles</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-yellow-400 mb-2">Thayer</div>
+                    <h4 class="font-bold text-sm mb-1">Mood Model</h4>
+                    <p class="text-sm text-slate-400">Arousal-Valence 2D model</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-red-400 mb-2">99</div>
+                    <h4 class="font-bold text-sm mb-1">Synonym Mappings</h4>
+                    <p class="text-sm text-slate-400">Comprehensive query expansion</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-amber-500 mb-2">44</div>
+                    <h4 class="font-bold text-sm mb-1">Mood Profiles</h4>
+                    <p class="text-sm text-slate-400">Gaussian feature profiles</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift">
+                    <div class="text-4xl font-black text-orange-500 mb-2">768</div>
+                    <h4 class="font-bold text-sm mb-1">Embedding Dim</h4>
+                    <p class="text-sm text-slate-400">BGE + CLAP vectors</p>
+                </div>
+            </div>
+            
+            <!-- Additional Achievements -->
+            <div class="grid md:grid-cols-3 gap-6 mt-8">
+                <div class="glass p-6 rounded-2xl text-center hover-lift border border-yellow-500/20">
+                    <i class="fas fa-layer-group text-yellow-400 text-2xl mb-3"></i>
+                    <h4 class="font-bold text-sm mb-1">17+ Audio Features</h4>
+                    <p class="text-sm text-slate-400">MFCCs, spectral contrast, ZCR, harmonic ratio, and more</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift border border-cyan-500/20">
+                    <i class="fas fa-search text-cyan-400 text-2xl mb-3"></i>
+                    <h4 class="font-bold text-sm mb-1">~15ms Query Time</h4>
+                    <p class="text-sm text-slate-400">Pre-computed embeddings for instant playlist generation</p>
+                </div>
+                <div class="glass p-6 rounded-2xl text-center hover-lift border border-red-500/20">
+                    <i class="fas fa-ban text-red-400 text-2xl mb-3"></i>
+                    <h4 class="font-bold text-sm mb-1">Negation Support</h4>
+                    <p class="text-sm text-slate-400">"Happy but not energetic" - understands complex queries</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Future Scope -->
+        <section class="animate-fadeInUp">
+            <h2 class="text-3xl font-black mb-10">Future Scope</h2>
+            <div class="glass p-10 rounded-[2.5rem] border border-slate-700/50">
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-check text-green-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2 text-green-400">CLAP Integration</h4>
+                            <p class="text-slate-400">CLAP audio-text alignment implemented with 768-dim embeddings</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-check text-green-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2 text-green-400">Lyrics Emotion</h4>
+                            <p class="text-slate-400">Transformer-based emotion classification (7-class) integrated</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-wave-square text-amber-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Adaptive Profiles</h4>
+                            <p class="text-slate-400">Learn feature profiles from user's library distribution</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-microphone text-amber-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Real-Time Analysis</h4>
+                            <p class="text-slate-400">Live microphone input for instant mood detection</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-mobile-alt text-amber-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Mobile App</h4>
+                            <p class="text-slate-400">Optimized models for iOS/Android with ONNX export</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-users text-amber-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">User Feedback</h4>
+                            <p class="text-slate-400">Implicit feedback (skip rates) to personalize over time</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-random text-amber-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Playlist Coherence</h4>
+                            <p class="text-slate-400">Transition smoothing based on BPM, key, energy</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-chart-line text-amber-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Hybrid Filtering</h4>
+                            <p class="text-slate-400">Combine with collaborative filtering for better results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Academic Credits -->
+        <section id="credits" class="text-center pt-10 border-t border-slate-900 animate-fadeInUp">
+            <h2 class="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em] mb-12">Academic Credits</h2>
+            <div class="flex flex-wrap justify-center gap-10">
+                <div class="glass px-12 py-8 rounded-[2rem] border-b-4 border-blue-600 hover-lift">
+                    <p class="text-[9px] font-bold text-amber-500 mb-2 uppercase tracking-widest">Project Guide</p>
+                    <p class="font-black text-xl text-slate-100">Dr. Virendra Kumar Meghwal</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Department of CSE</p>
+                </div>
+                <div class="glass px-12 py-8 rounded-[2rem] border-b-4 border-slate-700 hover-lift">
+                    <p class="text-[9px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Student</p>
+                    <p class="font-black text-xl text-slate-100">Ankit Bangadkar</p>
+                    <p class="text-[10px] text-slate-500 mt-1">ID: 2427030148</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="py-6 text-center" style="margin-left: 280px;">
+        <p class="text-stone-600 text-xs">Manipal University Jaipur - Department of CSE - 2026</p>
+    </footer>
+
+    <script>
+        let sec = 0;
+        let timer = null;
+        function startTimer() {
+            timer = setInterval(() => {
+                sec++;
+                let m = Math.floor(sec / 60);
+                let s = sec % 60;
+                document.getElementById('displayTime').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                
+                if (sec >= 480 && sec < 600) {
+                    document.getElementById('timerContainer').classList.add('timer-warning');
+                    document.getElementById('timerIcon').classList.replace('fa-hourglass-start', 'fa-hourglass-half');
+                } else if (sec >= 600) {
+                    clearInterval(timer);
+                    document.getElementById('timerContainer').classList.replace('timer-warning', 'timer-stop');
+                    document.getElementById('displayTime').innerText = "10:00";
+                    document.getElementById('timerIcon').classList.replace('fa-hourglass-half', 'fa-hourglass-end');
+                }
+            }, 909);
+        }
+
+        // RESULTS CHART
+        const ctx = document.getElementById('resultsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Semantic Only (Baseline)', '5-Signal Ensemble (Ours)'],
+                datasets: [{
+                    label: 'Precision@5 (%)',
+                    data: [35, 75],
+                    backgroundColor: ['#64748b', '#f59e0b'],
+                    borderRadius: 15,
+                    barThickness: 60
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: 'Performance Comparison (8 Test Queries)',
+                        color: '#94a3b8',
+                        font: { size: 14, weight: 'bold' }
+                    }
+                },
+                scales: { 
+                    y: { 
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: '#ffffff05' }, 
+                        ticks: { color: '#475569' },
+                        title: {
+                            display: true,
+                            text: 'Precision@5 (%)',
+                            color: '#64748b'
+                        }
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#94a3b8', font: { weight: 'bold' } }
+                    }
+                }
+            }
+        });
+
+        // Smooth scroll for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    const headerOffset = 100;
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+        
+        // Sidebar active state on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.sidebar-nav a');
+        
+        const updateActiveNav = () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (window.scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        };
+        
+        window.addEventListener('scroll', updateActiveNav);
+        updateActiveNav();
+
+        // Add scroll animations
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.animate-fadeInUp').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+            observer.observe(el);
+        });
+
+        // Animate progress bars on scroll
+        const progressObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const fills = entry.target.querySelectorAll('.progress-fill');
+                    fills.forEach(fill => {
+                        const width = fill.style.width;
+                        fill.style.width = '0%';
+                        setTimeout(() => {
+                            fill.style.width = width;
+                        }, 200);
+                    });
+                }
+            });
+        }, observerOptions);
+
+        const resultsSection = document.getElementById('results');
+        if (resultsSection) {
+            progressObserver.observe(resultsSection);
+        }
+    </script>
+</body>
+</html>
