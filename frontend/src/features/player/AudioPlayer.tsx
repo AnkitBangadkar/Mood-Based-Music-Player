@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react'
 import { usePlayerStore } from '@/store/playerStore'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   Play, 
   Pause, 
@@ -12,7 +14,8 @@ import {
   Volume2, 
   VolumeX,
   Disc3,
-  ListMusic
+  ListMusic,
+  FileText
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -66,6 +69,35 @@ export function AudioPlayer() {
   const currentSong = queue[currentIndex]
   const progress = duration ? (currentTime / duration) * 100 : 0
 
+  const [showLyrics, setShowLyrics] = useState(false)
+  const [lyricsText, setLyricsText] = useState<string | null>(null)
+  const [loadingLyrics, setLoadingLyrics] = useState(false)
+
+  useEffect(() => {
+    if (!currentSong?.id || !currentSong?.has_lyrics) {
+      setLyricsText(null)
+      return
+    }
+    setLyricsText(null)
+  }, [currentSong?.id, currentSong?.has_lyrics])
+
+  const fetchLyrics = async () => {
+    if (!currentSong?.id) return
+    setLoadingLyrics(true)
+    try {
+      const res = await fetch(`/lyrics/${currentSong.id}`)
+      const data = await res.json()
+      if (data.has_lyrics && data.lyrics) {
+        setLyricsText(data.lyrics)
+        setShowLyrics(true)
+      }
+    } catch (e) {
+      console.error('Failed to fetch lyrics:', e)
+    } finally {
+      setLoadingLyrics(false)
+    }
+  }
+
   if (!currentSong) {
     return (
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
@@ -84,9 +116,27 @@ export function AudioPlayer() {
 
   return (
     <TooltipProvider>
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-3xl px-4">
-        <div className="glass-floating player-island rounded-3xl px-6 py-4">
-          <div className="flex items-center gap-4">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-4">
+        <div className="glass-floating player-island rounded-3xl px-6 py-4 space-y-3">
+          {/* Progress Bar - Full Width on Top */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground w-10 text-right tabular-nums shrink-0">
+              {formatTime(currentTime)}
+            </span>
+            <Slider
+              value={[progress]}
+              max={100}
+              step={0.1}
+              className="flex-1"
+              onValueChange={([value]) => seek((value / 100) * duration)}
+            />
+            <span className="text-xs text-muted-foreground w-10 tabular-nums shrink-0">
+              {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Controls Row */}
+          <div className="flex items-center gap-4 min-w-0">
             {/* Album Art */}
             <div className={cn(
               "w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-500",
@@ -103,15 +153,26 @@ export function AudioPlayer() {
 
             {/* Track Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold truncate">{currentSong.title}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-sm font-semibold truncate min-w-0">{currentSong.title}</p>
                 <AnimatedEqualizer isPlaying={isPlaying} />
+                {currentSong.has_lyrics && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-amber-500 shrink-0"
+                    onClick={fetchLyrics}
+                    disabled={loadingLyrics}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">{currentSong.artist}</p>
             </div>
 
             {/* Controls */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -202,25 +263,8 @@ export function AudioPlayer() {
               </Tooltip>
             </div>
 
-            {/* Progress & Volume */}
-            <div className="hidden md:flex items-center gap-3 flex-1 max-w-xs">
-              <span className="text-xs text-muted-foreground w-10 text-right tabular-nums">
-                {formatTime(currentTime)}
-              </span>
-              <Slider
-                value={[progress]}
-                max={100}
-                step={0.1}
-                className="flex-1"
-                onValueChange={([value]) => seek((value / 100) * duration)}
-              />
-              <span className="text-xs text-muted-foreground w-10 tabular-nums">
-                {formatTime(duration)}
-              </span>
-            </div>
-
             {/* Volume */}
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -250,7 +294,7 @@ export function AudioPlayer() {
             </div>
 
             {/* Queue indicator */}
-            <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-border/50">
+            <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-border/50 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground">
@@ -263,9 +307,10 @@ export function AudioPlayer() {
               </Tooltip>
             </div>
           </div>
+        </div>
 
           {/* Mobile Progress Bar */}
-          <div className="md:hidden mt-3 flex items-center gap-2">
+          <div className="md:hidden flex items-center gap-2">
             <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
               {formatTime(currentTime)}
             </span>
@@ -281,7 +326,27 @@ export function AudioPlayer() {
             </span>
           </div>
         </div>
-      </div>
-    </TooltipProvider>
+
+        {/* Lyrics Dialog */}
+        <Dialog open={showLyrics} onOpenChange={setShowLyrics}>
+          <DialogContent className="max-w-lg max-h-[70vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold">{currentSong.title}</DialogTitle>
+              <p className="text-sm text-muted-foreground">{currentSong.artist}</p>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto">
+              {loadingLyrics ? (
+                <p className="text-muted-foreground text-center py-8">Loading lyrics...</p>
+              ) : lyricsText ? (
+                <pre className="whitespace-pre-wrap text-sm leading-relaxed text-foreground font-sans">
+                  {lyricsText}
+                </pre>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No lyrics available</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </TooltipProvider>
   )
 }

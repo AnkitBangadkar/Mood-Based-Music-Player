@@ -199,7 +199,15 @@ def startup_event():
             if npm_path:
                 print("Frontend build issue - falling back to static")
             else:
-                print("npm not found - using static frontend")
+                print("\n" + "=" * 60)
+                print("  NODE.JS NOT FOUND - React frontend cannot be built")
+                print("=" * 60)
+                print("  To use the beautiful React frontend:")
+                print("    1. Install Node.js from https://nodejs.org")
+                print("    2. Restart the server")
+                print("")
+                print("  Falling back to basic static frontend for now...")
+                print("=" * 60 + "\n")
 
     # Mount frontend assets
     if frontend_dir.exists():
