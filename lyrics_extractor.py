@@ -64,6 +64,61 @@ def _save_to_cache(cache_path, lyrics):
         log.warning(f"Failed to save cache {cache_path}: {e}")
 
 
+def get_local_lyrics(filepath, title=None, artist=None):
+    """
+    Retrieve lyrics from local sources only (no online fetch).
+    Used during async mode fast pass so scan isn't blocked by network.
+    Priority:
+    1. Local Sidecar File (.lrc, .txt next to audio file)
+    2. Lyrics Cache (previously fetched online lyrics)
+    3. Embedded Tags (ID3 USLT, FLAC LYRICS)
+
+    Returns:
+        str: Lyrics text or None if not found.
+    """
+    cache_path = _get_cache_path(filepath, title, artist)
+
+    # 1. Check for Sidecar Files (user-provided local files)
+    base_path = os.path.splitext(filepath)[0]
+    for ext in [".lrc", ".txt"]:
+        sidecar = base_path + ext
+        if os.path.exists(sidecar):
+            try:
+                with open(sidecar, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if ext == ".lrc":
+                        content = _clean_lrc(content)
+                    if content and content.strip():
+                        _save_to_cache(cache_path, content)
+                    return content
+            except Exception as e:
+                log.error(f"Error reading sidecar lyrics {sidecar}: {e}")
+
+    # 2. Check Lyrics Cache
+    cached = _get_cached_lyrics(cache_path)
+    if cached:
+        return cached
+
+    # 3. Check Embedded Tags
+    try:
+        file_ext = os.path.splitext(filepath)[1].lower()
+        content = None
+        if file_ext == ".mp3":
+            content = _get_mp3_lyrics(filepath)
+        elif file_ext == ".flac":
+            content = _get_flac_lyrics(filepath)
+        elif file_ext == ".m4a":
+            content = _get_m4a_lyrics(filepath)
+
+        if content:
+            _save_to_cache(cache_path, content)
+            return content
+    except Exception as e:
+        log.warning(f"Error reading embedded lyrics for {filepath}: {e}")
+
+    return None
+
+
 def get_lyrics(filepath, title=None, artist=None, allow_online=False):
     """
     Attempts to retrieve lyrics for a given audio file.
@@ -87,12 +142,15 @@ def get_lyrics(filepath, title=None, artist=None, allow_online=False):
                 with open(sidecar, "r", encoding="utf-8") as f:
                     content = f.read()
                     if ext == ".lrc":
-                        return _clean_lrc(content)
+                        content = _clean_lrc(content)
+                    # Cache sidecar lyrics for faster future retrieval
+                    if content and content.strip():
+                        _save_to_cache(cache_path, content)
                     return content
             except Exception as e:
                 log.error(f"Error reading sidecar lyrics {sidecar}: {e}")
 
-    # 2. Check Lyrics Cache (previously fetched from online)
+    # 2. Check Lyrics Cache (previously fetched from online or cached from sidecar)
     cached = _get_cached_lyrics(cache_path)
     if cached:
         return cached
@@ -117,14 +175,35 @@ def get_lyrics(filepath, title=None, artist=None, allow_online=False):
 
     # 4. Online Fetch (Optional) - only if not cached
     if allow_online and title and artist:
-        log.info(f"Local lyrics not found for '{title}', attempting online fetch...")
-        online_lyrics = lyrics_scraper.fetch_lyrics(title, artist)
+        from scanner import clean_title_for_embedding
+
+        clean_title = clean_title_for_embedding(title)
+        clean_artist = _clean_artist_for_lookup(artist)
+        log.info(
+            f"Local lyrics not found for '{clean_title}' by '{clean_artist}', attempting online fetch..."
+        )
+        online_lyrics = lyrics_scraper.fetch_lyrics(clean_title, clean_artist)
         if online_lyrics:
-            # Save to cache for future scans
             _save_to_cache(cache_path, online_lyrics)
             return online_lyrics
 
     return None
+
+
+def _clean_artist_for_lookup(artist):
+    """Clean artist name for lyrics lookup.
+    Remove common garbage like 'Topic', '- Topic', 'VEVO', etc.
+    """
+    if not artist:
+        return ""
+    import re
+
+    artist = re.sub(r"\s*[-–]\s*Topic$", "", artist, flags=re.IGNORECASE)
+    artist = re.sub(r"\s*Topic$", "", artist, flags=re.IGNORECASE)
+    artist = re.sub(r"\s*VEVO$", "", artist, flags=re.IGNORECASE)
+    artist = re.sub(r"\s*\(.*?\)\s*$", "", artist)
+    artist = artist.strip()
+    return artist
 
 
 import re
@@ -241,3 +320,49 @@ def get_cache_stats():
     )
 
     return {"count": len(files), "size_mb": round(total_size / (1024 * 1024), 2)}
+
+
+def get_lyrics_for_song(song_id, allow_online=False):
+    """
+    Retrieve lyrics for a song by its database ID.
+
+    Priority:
+    1. Database lyrics_text column (from previous scan)
+    2. Filesystem cache + sidecar + embedded (via get_lyrics)
+
+    Args:
+        song_id: The database ID of the song.
+        allow_online: Whether to fetch lyrics online if not found locally.
+
+    Returns:
+        str: Lyrics text or None if not found.
+    """
+    import database
+
+    song = database.get_song_by_id(song_id)
+    if song is None:
+        return None
+
+    lyrics_text = song["lyrics_text"] if "lyrics_text" in song.keys() else None
+    if lyrics_text:
+        return lyrics_text
+
+    filepath = song["filepath"]
+    title = song["title"] or "Unknown"
+    artist = song["artist"] or "Unknown"
+
+    lyrics = get_lyrics(filepath, title=title, artist=artist, allow_online=allow_online)
+
+    if lyrics:
+        try:
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE songs SET lyrics_text = ? WHERE id = ?",
+                (lyrics, song_id),
+            )
+            conn.commit()
+        except Exception:
+            pass
+
+    return lyrics

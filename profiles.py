@@ -62,6 +62,7 @@ QUERY_SYNONYMS = {
     "joy": ["happy", "joyful", "cheerful"],
     "excited": ["energetic", "hype", "happy"],
     "energetic": ["energetic", "workout", "hype"],
+    "workout": ["workout", "energetic", "hype"],
     "tired": ["calm", "sleep", "relaxing"],
     "exhausted": ["calm", "sleep", "relaxing"],
     "dreamy": ["chill", "calm", "peaceful"],
@@ -180,14 +181,14 @@ FEATURE_PROFILES = {
         "mfcc1": (105.0, 0.25),
     },
     "cheerful": {
-        "valence": (0.18, 0.7),
+        "valence": (0.55, 0.70),
         "arousal": (0.65, 0.5),
-        "mode_major": (True, 0.2),
+        "mode_major": (True, 0.3),
         "bpm": (120, 0.4),
         "spectral_rolloff": (5000, 0.2),
     },
     "uplifting": {
-        "valence": (0.15, 0.6),
+        "valence": (0.50, 0.60),
         "arousal": (0.65, 0.5),
         "mode_major": (True, 0.3),
         "bpm": (120, 0.4),
@@ -200,7 +201,7 @@ FEATURE_PROFILES = {
         "brightness": (3500, 0.40),
     },
     "positive": {
-        "valence": (0.15, 0.7),
+        "valence": (0.50, 0.70),
         "arousal": (0.55, 0.4),
         "mode_major": (True, 0.3),
     },
@@ -214,7 +215,7 @@ FEATURE_PROFILES = {
     "sad": {
         "valence": (-0.62, 0.90),
         "arousal": (0.28, 0.50),
-        "mode_major": (False, 0.65),
+        "mode_major": (False, 0.45),
         "bpm": (78, 0.45),
         "energy": (0.11, 0.35),
         "brightness": (1900, 0.45),
@@ -225,7 +226,7 @@ FEATURE_PROFILES = {
     "melancholy": {
         "valence": (-0.7, 1.0),
         "arousal": (0.25, 0.6),
-        "mode_major": (False, 0.6),
+        "mode_major": (False, 0.45),
         "bpm": (80, 0.5),
         "spectral_rolloff": (3500, 0.3),
         "mfcc1": (85.0, 0.25),
@@ -234,7 +235,7 @@ FEATURE_PROFILES = {
     "somber": {
         "valence": (-0.75, 1.0),
         "arousal": (0.2, 0.7),
-        "mode_major": (False, 0.7),
+        "mode_major": (False, 0.45),
         "bpm": (75, 0.5),
         "spectral_rolloff": (3000, 0.3),
         "mfcc1": (80.0, 0.25),
@@ -243,7 +244,7 @@ FEATURE_PROFILES = {
     "heartbreak": {
         "valence": (-0.6, 0.9),
         "arousal": (0.35, 0.5),
-        "mode_major": (False, 0.5),
+        "mode_major": (False, 0.40),
         "energy": (0.12, 0.3),
         "mfcc1": (85.0, 0.25),
         "mfcc2": (-8.0, 0.2),
@@ -251,7 +252,7 @@ FEATURE_PROFILES = {
     "depressing": {
         "valence": (-0.8, 1.0),
         "arousal": (0.15, 0.8),
-        "mode_major": (False, 0.7),
+        "mode_major": (False, 0.45),
         "bpm": (70, 0.5),
         "energy": (0.08, 0.4),
         "spectral_rolloff": (2800, 0.4),
@@ -337,11 +338,11 @@ FEATURE_PROFILES = {
     },
     # ─── NEGATIVE VALENCE + HIGH AROUSAL (Angry/Intense) ───
     "angry": {
-        "valence": (-0.35, 0.70),
+        "valence": (-0.55, 0.80),
         "arousal": (0.82, 0.80),
         "energy": (0.29, 1.0),
         "bpm": (132, 0.6),
-        "mode_major": (False, 0.70),
+        "mode_major": (False, 0.45),
         "brightness": (2300, 0.45),
         "spectral_rolloff": (3000, 0.40),
     },
@@ -352,7 +353,7 @@ FEATURE_PROFILES = {
         "spectral_bandwidth": (2800, 0.3),
     },
     "dark": {
-        "mode_major": (False, 1.0),
+        "mode_major": (False, 0.50),
         "brightness": (1500, 0.6),
         "valence": (-0.5, 0.5),
         "spectral_rolloff": (3000, 0.5),
@@ -364,7 +365,7 @@ FEATURE_PROFILES = {
         "spectral_rolloff": (3500, 0.3),
     },
     "mysterious": {
-        "mode_major": (False, 0.9),
+        "mode_major": (False, 0.50),
         "brightness": (1500, 0.6),
         "arousal": (0.35, 0.5),
         "spectral_rolloff": (3000, 0.4),
@@ -372,15 +373,15 @@ FEATURE_PROFILES = {
     "fear": {
         "arousal": (0.85, 0.9),
         "energy": (0.25, 0.7),
-        "mode_major": (False, 0.8),
+        "mode_major": (False, 0.45),
         "brightness": (1200, 0.5),
         "spectral_rolloff": (2800, 0.4),
     },
     "hate": {
-        "valence": (-0.6, 0.8),
+        "valence": (-0.6, 0.85),
         "arousal": (0.85, 0.8),
         "energy": (0.28, 1.0),
-        "mode_major": (False, 0.7),
+        "mode_major": (False, 0.45),
         "bpm": (130, 0.6),
     },
     # ─── POSITIVE VALENCE + LOW AROUSAL (Content/Romantic) ───
@@ -428,7 +429,7 @@ FEATURE_PROFILES = {
     "brooding": {
         "valence": (-0.38, 0.70),
         "arousal": (0.45, 0.60),
-        "mode_major": (False, 0.80),
+        "mode_major": (False, 0.50),
         "bpm": (82, 0.55),
         "energy": (0.13, 0.50),
         "brightness": (1700, 0.60),

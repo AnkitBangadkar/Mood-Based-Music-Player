@@ -3,231 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoulSeek - Mood Playlist Generator</title>
+    <title>SoulSeek</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="/static/lucide.js"></script>
 </head>
 <body>
 
-    <!-- Header -->
-    <header>
-        <div class="logo">
-            <div class="logo-icon">
-                <i data-lucide="music"></i>
+<div class="app-shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">
+                <i data-lucide="radio"></i>
             </div>
-            <h1>SoulSeek</h1>
+            <div class="brand-text">
+                <span class="brand-title">SoulSeek</span>
+                <span class="brand-subtitle">Mood Discovery</span>
+            </div>
         </div>
-        <div class="scan-controls">
-            <button class="secondary" id="scan-btn">
+
+        <nav class="nav-section">
+            <span class="nav-label">Discover</span>
+            <div class="nav-item active" id="nav-discover">
+                <i data-lucide="compass"></i>
+                <span>Discover</span>
+            </div>
+            <div class="nav-item" id="nav-library">
+                <i data-lucide="library"></i>
+                <span>Library</span>
+                <span class="nav-badge" id="nav-library-count">0</span>
+            </div>
+            <div class="nav-item" id="nav-scan">
                 <i data-lucide="folder-search"></i>
-                Scan Library
-            </button>
-            <div class="library-menu-container">
-                <button class="secondary library-btn" id="library-btn">
-                    <i data-lucide="library"></i>
-                    <span id="library-btn-text">Library</span>
-                    <span id="library-progress" class="library-progress hidden"></span>
-                </button>
-                <div id="library-dropdown" class="library-dropdown hidden">
-                    <div class="library-dropdown-header">
-                        <span id="library-stats">0 songs indexed</span>
-                        <span id="library-last-scan">Last scan: --</span>
+                <span>Scan Folder</span>
+            </div>
+        </nav>
+
+        <nav class="nav-section">
+            <span class="nav-label">Manage</span>
+            <div class="nav-item" id="nav-settings">
+                <i data-lucide="sliders-horizontal"></i>
+                <span>Settings</span>
+            </div>
+        </nav>
+
+        <div class="status-card" id="status-card">
+            <div class="status-header">
+                <span class="status-dot idle" id="status-dot"></span>
+                <span class="status-text" id="status-text">Ready</span>
+                <i data-lucide="chevron-down" id="status-chevron" class="status-chevron"></i>
+            </div>
+            <div class="status-meta" id="status-meta">No tracks indexed</div>
+            
+            <!-- Expandable details -->
+            <div class="status-details hidden" id="status-details">
+                <!-- Progress section (shown during scan) -->
+                <div class="progress-section hidden" id="scan-progress-section">
+                    <div class="progress-item">
+                        <div class="progress-label">
+                            <span>Audio Analysis</span>
+                            <span id="audio-progress-text">0/0</span>
+                        </div>
+                        <div class="progress-bar-mini">
+                            <div class="progress-fill-mini" id="audio-progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-time" id="audio-time">--</div>
                     </div>
-                    <div class="library-dropdown-actions">
-                        <button class="dropdown-item" id="show-progress-btn">
-                            <i data-lucide="eye"></i>
-                            Show Progress
-                        </button>
-                        <button class="dropdown-item danger" id="flush-library-btn">
-                            <i data-lucide="trash-2"></i>
-                            Flush Library
-                        </button>
+                    
+                    <div class="progress-item" style="margin-top: 0.75rem;">
+                        <div class="progress-label">
+                            <span>Lyrics Fetch</span>
+                            <span id="lyrics-progress-text">0/0</span>
+                        </div>
+                        <div class="progress-bar-mini">
+                            <div class="progress-fill-mini" id="lyrics-progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-time" id="lyrics-time">--</div>
                     </div>
                 </div>
+                
+                <!-- Folders section (shown when not scanning) -->
+                <div class="folders-section" id="folders-section">
+                    <span class="nav-label">Scanned Folders</span>
+                    <div id="scanned-folders-list" class="scanned-folders-list"></div>
+                </div>
             </div>
+        </div>
+    </aside>
+
+    <!-- HEADER -->
+    <header class="app-header">
+        <div class="header-search">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="prompt-input" class="search-input" placeholder="Describe a mood... (e.g., 'rainy day melancholy')" autocomplete="off">
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" id="generate-btn">
+                <i data-lucide="zap"></i>
+                <span>Generate</span>
+            </button>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main>
-        <!-- Scan Progress Panel (appears when scanning) -->
-        <section id="scan-progress-panel" class="scan-progress-panel hidden">
-            <div class="scan-progress-header">
-                <div class="scan-status-info">
-                    <i data-lucide="folder-search"></i>
-                    <span class="scan-title" id="scan-panel-title">Scanning Library</span>
-                    <span id="scan-panel-stage" class="scan-stage">Preparing...</span>
-                </div>
-                <div class="scan-progress-actions">
-                    <div class="scan-time-info">
-                        <span id="scan-panel-elapsed">00:00 elapsed</span>
-                        <span id="scan-panel-eta" class="scan-eta">ETA: --:--</span>
-                    </div>
-                    <button class="scan-close-btn" id="scan-close-btn" title="Minimize to header">
-                        <i data-lucide="x"></i>
-                    </button>
-                </div>
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- Hero / Empty State -->
+        <div id="hero-state" class="hero">
+            <div class="hero-icon">
+                <i data-lucide="radio"></i>
             </div>
-            <div class="scan-progress-bar-container">
-                <div id="scan-panel-progress-fill" class="scan-progress-bar-fill" style="width: 0%"></div>
-            </div>
-            <div class="scan-progress-details">
-                <span id="scan-panel-current">0 / 0 files</span>
-                <span id="scan-panel-total">Total: 0 songs</span>
-                <span id="scan-panel-percent" class="scan-percent">0%</span>
-            </div>
-            <div id="scan-panel-file" class="scan-current-file"></div>
-            <div id="scan-complete-actions" class="scan-complete-actions hidden">
-                <button class="secondary" id="dismiss-complete-btn">
-                    <i data-lucide="check"></i>
-                    Dismiss
-                </button>
-            </div>
-        </section>
-
-        <!-- Generator Panel -->
-        <section class="generator-panel">
-            <input type="text" id="prompt-input" placeholder="Describe a mood (e.g., 'Sad songs for a rainy day')..." autocomplete="off">
-            <button class="primary" id="generate-btn">
-                <i data-lucide="wand-2"></i>
-                Generate Playlist
+            <h1 class="hero-title">Discover Your Mood</h1>
+            <p class="hero-desc">Enter a mood description above to generate a playlist tailored to your emotional state.</p>
+            <button class="btn btn-secondary" id="hero-scan-btn">
+                <i data-lucide="folder-search"></i>
+                <span>Scan Music Folder</span>
             </button>
-        </section>
+        </div>
 
-        <!-- Results / Queue -->
-        <section id="results-area">
-            <div class="song-headers song-item">
-                <span class="index">#</span>
-                <span class="title">Title</span>
-                <span class="album">Album</span>
-                <span class="bpm">Arousal</span>
-                <span class="bpm">Valence</span>
-                <span class="score">Match</span>
-                <span class="duration">Time</span>
-            </div>
-            <div id="song-list" class="song-list">
-                <!-- Songs will be injected here -->
-                <div class="empty-state">
-                    <i data-lucide="music-2"></i>
-                    <p>Generate a playlist to see songs here.</p>
+        <!-- Results Section (hidden initially) -->
+        <div id="results-section" class="hidden">
+            <!-- Visualizer -->
+            <div class="visualizer">
+                <div class="visualizer-bars" id="visualizer-bars">
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                </div>
+                <div class="visualizer-overlay">
+                    <div class="visualizer-play-hint">
+                        <i data-lucide="play-circle"></i>
+                        <span>Play a track to start visualization</span>
+                    </div>
                 </div>
             </div>
-        </section>
-    </main>
 
-    <!-- Player Bar -->
-    <footer class="player-bar">
-        <!-- Song Info -->
-        <div class="now-playing">
-            <div class="now-playing-info">
-                <div class="now-playing-title" id="np-title">No Song Selected</div>
-                <div class="now-playing-artist" id="np-artist">-</div>
+            <!-- Section Header -->
+            <div class="section-header">
+                <h2 class="section-title" id="results-title">Generated Playlist</h2>
+                <span class="nav-badge" id="results-count">0 tracks</span>
+            </div>
+
+            <!-- Track Grid -->
+            <div id="track-grid" class="track-grid">
+                <!-- Cards injected by JS -->
             </div>
         </div>
 
-        <!-- Controls -->
+        <!-- Library View (hidden initially) -->
+        <div id="library-view" class="hidden">
+            <!-- Library Header -->
+            <div class="library-header">
+                <h2 class="section-title">Your Library</h2>
+                <div class="library-controls">
+                    <div class="library-search">
+                        <i data-lucide="search" class="library-search-icon"></i>
+                        <input type="text" id="library-search-input" placeholder="Search songs, artists, albums...">
+                    </div>
+                    <select id="library-sort" class="library-sort">
+                        <option value="title">Title</option>
+                        <option value="artist">Artist</option>
+                        <option value="album">Album</option>
+                        <option value="recent">Recently Added</option>
+                    </select>
+                </div>
+            </div>
+            <span class="nav-badge" id="library-total-count">0 tracks</span>
+
+            <!-- Library Track List -->
+            <div id="library-list" class="library-list">
+                <!-- List items injected by JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- PLAYER BAR -->
+    <footer class="player-bar">
+        <div class="player-info">
+            <div class="player-art">
+                <i data-lucide="music"></i>
+            </div>
+            <div class="player-meta">
+                <div class="player-title" id="player-title">No Signal</div>
+                <div class="player-artist" id="player-artist">--</div>
+            </div>
+        </div>
+
         <div class="player-controls">
-            <div class="control-buttons">
-                <button class="control-btn" id="shuffle-btn" title="Shuffle">
+            <div class="player-buttons">
+                <button class="p-btn" id="shuffle-btn" title="Shuffle">
                     <i data-lucide="shuffle"></i>
                 </button>
-                <button class="control-btn" id="prev-btn" title="Previous">
+                <button class="p-btn" id="prev-btn" title="Previous">
                     <i data-lucide="skip-back"></i>
                 </button>
-                <button class="control-btn play-pause" id="play-pause-btn" title="Play/Pause">
+                <button class="p-btn play" id="play-pause-btn" title="Play">
                     <i data-lucide="play"></i>
                 </button>
-                <button class="control-btn" id="next-btn" title="Next">
+                <button class="p-btn" id="next-btn" title="Next">
                     <i data-lucide="skip-forward"></i>
                 </button>
-                <button class="control-btn" id="repeat-btn" title="Repeat">
+                <button class="p-btn" id="repeat-btn" title="Repeat">
                     <i data-lucide="repeat"></i>
                 </button>
             </div>
-            
-            <!-- Progress -->
-            <div class="progress-container">
-                <span id="current-time">0:00</span>
-                <input type="range" id="progress-bar" min="0" max="100" value="0">
-                <span id="duration">0:00</span>
+            <div class="player-progress">
+                <span class="time" id="current-time">0:00</span>
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <span class="time" id="duration">0:00</span>
             </div>
         </div>
 
-        <!-- Volume -->
-        <div class="volume-controls">
-            <i data-lucide="volume-2"></i>
-            <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="0.8">
+        <div class="player-extras">
+            <div class="volume-control">
+                <i data-lucide="volume-2"></i>
+                <div class="volume-bar" id="volume-bar">
+                    <div class="volume-fill" id="volume-fill" style="width: 80%"></div>
+                </div>
+            </div>
         </div>
     </footer>
+</div>
 
-    <!-- Scan Modal -->
-    <div id="scan-modal" class="modal-overlay hidden">
-        <div class="modal-content scan-modal">
-            <h2><i data-lucide="folder-search"></i> Scan Library</h2>
-            <p>Enter the absolute path to your music folder to index your collection.</p>
+<!-- SCAN MODAL -->
+<div id="scan-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i data-lucide="folder-search"></i>
+                <span>Scan Library</span>
+            </h3>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Select a folder to analyze your music collection.</p>
             
-            <!-- Path input with history dropdown -->
-            <div class="path-input-container">
-                <input type="text" id="scan-path-input" placeholder="/home/user/Music" autocomplete="off">
-                <button id="path-history-btn" class="path-history-toggle" title="Show recent paths">
-                    <i data-lucide="chevron-down"></i>
+            <!-- Native file picker (hidden) -->
+            <input type="file" id="native-folder-picker" webkitdirectory directory multiple style="display: none;">
+            
+            <!-- Selected folder display -->
+            <div class="folder-select-display">
+                <span class="folder-path" id="selected-folder-path">No folder selected</span>
+                <button class="btn btn-secondary" id="browse-folder-btn">
+                    <i data-lucide="folder-open"></i>
+                    <span>Browse...</span>
                 </button>
-                <div id="path-history-dropdown" class="path-history-dropdown hidden">
-                    <div class="path-history-header">
-                        <span>Recent Paths</span>
-                        <button id="clear-history-btn" class="clear-history">Clear</button>
+            </div>
+
+            <!-- Manual path input fallback -->
+            <div class="input-group" style="margin-top: 0.75rem;">
+                <input type="text" id="scan-path-input" class="text-input" placeholder="Or type absolute path directly..." autocomplete="off">
+            </div>
+
+            <!-- Recent folders -->
+            <div class="recent-folders" id="recent-folders-section">
+                <span class="nav-label">Recent Locations</span>
+                <div id="recent-folders-list" class="recent-list">
+                    <!-- Populated from localStorage -->
+                </div>
+            </div>
+
+            <label class="toggle-row" style="margin-top: 1rem;">
+                <div class="toggle-switch active" id="async-toggle">
+                    <div class="toggle-thumb"></div>
+                </div>
+                <span style="color: var(--text-secondary);">Fetch lyrics in background</span>
+            </label>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="cancel-scan-btn">Cancel</button>
+            <button class="btn btn-primary" id="confirm-scan-btn">
+                <i data-lucide="search"></i>
+                <span>Start Scan</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- SETTINGS/MANAGE MODAL -->
+<div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i data-lucide="sliders-horizontal"></i>
+                <span>Manage Library</span>
+            </h3>
+        </div>
+        <div class="modal-body">
+            <div class="flush-grid">
+                <button class="flush-card danger" id="flush-all-btn">
+                    <div class="flush-icon">
+                        <i data-lucide="trash-2"></i>
                     </div>
-                    <div id="path-history-list"></div>
-                </div>
-            </div>
-
-            <!-- Indexed folders section -->
-            <div id="indexed-folders-section" class="indexed-folders-section">
-                <h3><i data-lucide="folder-check"></i> Currently Indexed Folders</h3>
-                <div id="indexed-folders-list" class="indexed-folders-list">
-                    <p class="no-folders">Loading...</p>
-                </div>
-            </div>
-            
-            <div class="modal-buttons">
-                <button class="secondary" id="cancel-scan-btn">
-                    <i data-lucide="x"></i>
-                    Cancel
+                    <div class="flush-content">
+                        <div class="flush-title">Flush Everything</div>
+                        <div class="flush-desc">Remove all tracks and start fresh</div>
+                    </div>
                 </button>
-                <button class="primary" id="confirm-scan-btn">
-                    <i data-lucide="search"></i>
-                    Start Scan
+                <button class="flush-card warning" id="flush-clap-btn">
+                    <div class="flush-icon">
+                        <i data-lucide="brain"></i>
+                    </div>
+                    <div class="flush-content">
+                        <div class="flush-title">Clear CLAP Embeddings</div>
+                        <div class="flush-desc">Remove audio analysis data</div>
+                    </div>
                 </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Flush Library Confirmation Modal -->
-    <div id="flush-modal" class="modal-overlay hidden">
-        <div class="modal-content flush-modal">
-            <h2><i data-lucide="alert-triangle"></i> Flush Library</h2>
-            <p>Are you sure you want to delete all songs from the library? This action cannot be undone.</p>
-            <p class="flush-warning">All indexed songs, embeddings, and metadata will be permanently removed.</p>
-            
-            <div class="modal-buttons">
-                <button class="secondary" id="cancel-flush-btn">
-                    <i data-lucide="x"></i>
-                    Cancel
-                </button>
-                <button class="danger" id="confirm-flush-btn">
-                    <i data-lucide="trash-2"></i>
-                    Yes, Flush Library
+                <button class="flush-card warning" id="flush-text-btn">
+                    <div class="flush-icon">
+                        <i data-lucide="file-text"></i>
+                    </div>
+                    <div class="flush-content">
+                        <div class="flush-title">Clear Text Embeddings</div>
+                        <div class="flush-desc">Remove text analysis data</div>
+                    </div>
                 </button>
             </div>
         </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="close-settings-btn">Close</button>
+        </div>
     </div>
+</div>
 
-    <!-- Audio Element (Hidden) -->
-    <audio id="audio-player"></audio>
+<audio id="audio-player"></audio>
 
-    <script src="/static/app.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
+<script src="/static/app.js"></script>
+<script>lucide.createIcons();</script>
 </body>
 </html>

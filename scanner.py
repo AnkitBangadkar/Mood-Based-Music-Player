@@ -1,5 +1,5 @@
 """
-v8 Scanner - With incremental scanning and lyrics caching.
+v9 Scanner - With CLAP embeddings, richer mood text, incremental scanning.
 Only processes new/modified files, skips unchanged ones.
 """
 
@@ -17,6 +17,7 @@ import analyzer
 import lyrics_extractor
 from lyrics_extractor import clean_lyrics_text
 import sentiment
+import clap_embedder
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -206,17 +207,16 @@ def build_mood_text(
     dynamic_range=0.0,
 ):
     """
-    Creates a compact, keyword-dense mood description for embedding.
-    Uses 2D valence-arousal quadrants for coherent mood keywords,
-    preventing contradictory labels (e.g. "sad" + "upbeat" on same song).
+    Creates a natural-language mood description for embedding.
 
-    Quadrants:
-      High arousal + High valence → energetic, upbeat, powerful
-      High arousal + Low valence  → intense, dark, aggressive
-      Low arousal  + High valence → calm, peaceful, gentle
-      Low arousal  + Low valence  → sad, melancholic, somber
+    Uses full sentences instead of keyword lists because sentence-transformer
+    models are trained on natural language and produce much better embeddings
+    from coherent text than from comma-separated tags.
+
+    Includes a concise CLAP-friendly description as a separate sentence
+    for CLAP text query alignment.
     """
-    mood_words = []
+    parts = []
     t = config.MOOD_THRESHOLDS
 
     # === 2D Valence-Arousal Quadrant System ===
@@ -226,85 +226,124 @@ def build_mood_text(
     low_valence = valence < -0.1
 
     if high_arousal and high_valence:
-        mood_words.extend(["energetic", "upbeat", "powerful", "lively"])
+        parts.extend(["energetic", "upbeat", "powerful", "lively"])
     elif high_arousal and low_valence:
-        mood_words.extend(["intense", "dark", "aggressive", "fierce"])
+        parts.extend(["intense", "dark", "aggressive", "fierce"])
     elif low_arousal and high_valence:
-        mood_words.extend(["calm", "peaceful", "gentle", "serene"])
+        parts.extend(["calm", "peaceful", "gentle", "serene"])
     elif low_arousal and low_valence:
-        mood_words.extend(["sad", "melancholic", "somber", "mournful"])
+        parts.extend(["sad", "melancholic", "somber", "mournful"])
     elif high_arousal:
-        mood_words.extend(["driving", "energetic"])
+        parts.extend(["driving", "energetic"])
     elif low_arousal:
-        mood_words.extend(["relaxed", "mellow"])
+        parts.extend(["relaxed", "mellow"])
     elif high_valence:
-        mood_words.extend(["positive", "cheerful"])
+        parts.extend(["positive", "cheerful"])
     elif low_valence:
-        mood_words.extend(["reflective", "contemplative"])
+        parts.extend(["reflective", "contemplative"])
     else:
-        mood_words.extend(["moderate", "steady"])
+        parts.extend(["moderate", "steady"])
 
-    # Dynamic range contribution (LOG-SCALED values): dramatic swells vs flat/ambient
-    # log1p scale: ~0.7 = flat/compressed, ~2.8+ = dramatic swells
+    # Dynamic range contribution
     if dynamic_range > 2.8:
-        mood_words.extend(["dramatic", "cinematic", "epic"])
+        parts.extend(["dramatic", "cinematic", "epic"])
     elif dynamic_range < 1.2:
-        mood_words.extend(["ambient", "steady", "uniform"])
+        parts.extend(["ambient", "steady", "uniform"])
 
     # Lyrics emotion words (additive, from sentiment analysis)
     if lyrics_emotion_result and lyrics_emotion_result.get("mood_words"):
-        mood_words.extend(lyrics_emotion_result["mood_words"])
+        parts.extend(lyrics_emotion_result["mood_words"])
 
     # Mode contribution: only add bright/dark if key detection is confident
     if key_confidence >= 0.65:
         if mode == "major":
-            mood_words.append("bright")
+            parts.append("bright")
         elif mode == "minor":
-            mood_words.append("dark")
+            parts.append("dark")
 
     # Harmonic ratio: melodic vs percussive character
     if harmonic_ratio > 0.85:
-        mood_words.extend(["melodic", "smooth"])
+        parts.extend(["melodic", "smooth"])
     elif harmonic_ratio < 0.55:
-        mood_words.extend(["percussive", "rhythmic"])
+        parts.extend(["percussive", "rhythmic"])
 
     if bpm > 0:
         if bpm >= t["bpm_fast"]:
-            mood_words.append("fast")
+            parts.append("fast")
         elif bpm <= t["bpm_slow"]:
-            mood_words.append("slow")
+            parts.append("slow")
 
     if brightness > 0:
         if brightness >= t["brightness_bright"]:
-            mood_words.append("sharp")
+            parts.append("sharp")
         elif brightness <= t["brightness_dark"]:
-            mood_words.append("deep")
+            parts.append("deep")
 
-    unique_moods = list(dict.fromkeys(mood_words))[:10]
+    unique_moods = list(dict.fromkeys(parts))[:10]
+
+    # --- Build natural language sentence ---
+    # Tempo description
+    if bpm > 0:
+        if bpm >= 160:
+            tempo_desc = "very fast"
+        elif bpm >= 120:
+            tempo_desc = "moderately fast"
+        elif bpm >= 90:
+            tempo_desc = "moderate tempo"
+        elif bpm >= 70:
+            tempo_desc = "slow"
+        else:
+            tempo_desc = "very slow"
+    else:
+        tempo_desc = "unknown tempo"
+
+    # Mood sentence
     mood_str = ", ".join(unique_moods) if unique_moods else "neutral"
+    sentence = f"A {mood_str} track"
 
-    tempo_str = f"{bpm:.0f} BPM" if bpm > 0 else ""
-    mode_str = f"{mode} key" if mode else ""
-    features = [s for s in [tempo_str, mode_str] if s]
-    feature_str = ". ".join(features) + "." if features else ""
+    if bpm > 0:
+        sentence += f" at {bpm:.0f} BPM ({tempo_desc})"
 
-    # Clean title for embedding (remove track numbers, metadata tags)
-    # Use only title (not artist) to avoid false matches from artist names
+    if key_confidence >= 0.65 and mode:
+        mode_word = "major" if mode == "major" else "minor"
+        sentence += f" in a {mode_word} key"
+
+    if energy > 0.25:
+        sentence += " with high intensity"
+    elif energy < 0.10:
+        sentence += " with gentle dynamics"
+
+    if dynamic_range > 2.8:
+        sentence += " and dramatic swells"
+    elif dynamic_range < 1.2:
+        sentence += " with steady volume"
+
+    # Genre mention
     cleaned_title = clean_title_for_embedding(title)
-    meta = cleaned_title
+    if genre and genre.lower() not in ("", "unknown"):
+        sentence += f". {genre} genre"
+    if cleaned_title:
+        sentence += f". {cleaned_title}"
 
+    # Lyrics snippet (kept concise, most impactful part)
     lyrics_part = ""
     if lyrics_snippet and len(lyrics_snippet) > 20:
-        clean = lyrics_snippet.replace("\n", " ").strip()[:400]
+        clean = lyrics_snippet.replace("\n", " ").strip()[:300]
         lyrics_part = f" Lyrics: {clean}..."
 
-    description = f"{mood_str}. {feature_str} {meta}{lyrics_part}"
+    description = sentence + lyrics_part
 
     return description
 
 
-def process_file(filepath, enable_audio, enable_lyrics, enable_online_lyrics):
-    """Worker function to process a single file."""
+def process_file(
+    filepath, enable_audio, enable_lyrics, enable_online_lyrics, async_lyrics=False
+):
+    """Worker function to process a single file.
+
+    When async_lyrics=True, only local lyrics sources are checked (no online fetch).
+    Online lyrics will be fetched later in the background.
+    """
     import logging
 
     thread_log = logging.getLogger("MoodPlaylist.Scanner.Worker")
@@ -360,17 +399,26 @@ def process_file(filepath, enable_audio, enable_lyrics, enable_online_lyrics):
         lyrics_emotion_result = None
         lyrics_emotion = None
         lyrics_emotion_score = 0.0
+        lyrics_text = None
 
         if enable_lyrics:
             try:
-                lyrics = lyrics_extractor.get_lyrics(
-                    filepath,
-                    title=title,
-                    artist=artist,
-                    allow_online=enable_online_lyrics,
-                )
+                if async_lyrics:
+                    lyrics = lyrics_extractor.get_local_lyrics(
+                        filepath,
+                        title=title,
+                        artist=artist,
+                    )
+                else:
+                    lyrics = lyrics_extractor.get_lyrics(
+                        filepath,
+                        title=title,
+                        artist=artist,
+                        allow_online=enable_online_lyrics,
+                    )
                 if lyrics:
                     has_lyrics = True
+                    lyrics_text = lyrics
                     # Clean lyrics before analysis
                     cleaned_lyrics = clean_lyrics_text(lyrics)
                     # Smart lyrics extraction with increased limit
@@ -437,6 +485,8 @@ def process_file(filepath, enable_audio, enable_lyrics, enable_online_lyrics):
             "spectral_bandwidth": spectral_bandwidth,
             "dynamic_range": dynamic_range,
             "mfccs": json.dumps(mfccs) if mfccs else None,
+            "lyrics_text": lyrics_text,
+            "clap_embedding": None,  # Will be filled in batch processing
         }
 
     except Exception as e:
@@ -448,7 +498,8 @@ def scan_library(
     directory_path,
     enable_audio=True,
     enable_lyrics=True,
-    enable_online_lyrics=False,
+    enable_online_lyrics=None,
+    enable_async_lyrics=None,
     force_rescan=False,
     progress_callback=None,
     preserve_existing=True,
@@ -457,6 +508,8 @@ def scan_library(
     Incremental scan - only processes new or modified files.
 
     Args:
+        enable_async_lyrics: If True, skip online lyrics during scan (fast pass).
+            Online lyrics fetched later in background. Defaults to config.LYRICS_ASYNC_ENABLED.
         force_rescan: If True, clears DB and rescans everything.
         progress_callback: Optional callback function called with progress dict:
             {
@@ -471,6 +524,14 @@ def scan_library(
     """
     start_time = time.time()
     log.info(f"Starting scan: {directory_path}")
+
+    if enable_online_lyrics is None:
+        enable_online_lyrics = config.LYRICS_ONLINE_ENABLED
+    if enable_async_lyrics is None:
+        enable_async_lyrics = config.LYRICS_ASYNC_ENABLED
+
+    # In async mode, we skip online lyrics during scan (they'll be fetched later)
+    effective_online = False if enable_async_lyrics else enable_online_lyrics
 
     database.init_db()
 
@@ -551,6 +612,17 @@ def scan_library(
         return database.get_song_count()
 
     eng = engine.get_engine()
+
+    # Initialize CLAP embedder if enabled (before threading)
+    clap_embedder_instance = None
+    if config.CLAP_ENABLED:
+        try:
+            clap_embedder_instance = clap_embedder.get_embedder()
+            log.info("CLAP embedder loaded successfully")
+        except Exception as e:
+            log.warning(f"Failed to load CLAP embedder: {e}")
+            log.warning("CLAP will be disabled for this scan")
+
     all_ids = []
     all_embeddings = []
 
@@ -560,7 +632,12 @@ def scan_library(
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
             executor.submit(
-                process_file, f, enable_audio, enable_lyrics, enable_online_lyrics
+                process_file,
+                f,
+                enable_audio,
+                enable_lyrics,
+                effective_online,
+                enable_async_lyrics,
             ): f
             for f in files_to_scan
         }
@@ -571,7 +648,9 @@ def scan_library(
                 batch_data.append(res)
 
                 if len(batch_data) >= BATCH_SIZE:
-                    _process_batch(batch_data, all_ids, all_embeddings, eng)
+                    _process_batch(
+                        batch_data, all_ids, all_embeddings, eng, clap_embedder_instance
+                    )
                     count += len(batch_data)
                     log.info(f"Progress: {count}/{len(files_to_scan)} new files...")
                     if progress_callback:
@@ -590,7 +669,7 @@ def scan_library(
                     batch_data = []
 
     if batch_data:
-        _process_batch(batch_data, all_ids, all_embeddings, eng)
+        _process_batch(batch_data, all_ids, all_embeddings, eng, clap_embedder_instance)
         count += len(batch_data)
 
     # Rebuild the full index including existing songs
@@ -685,10 +764,19 @@ def _rebuild_index_from_db():
     eng.save_index()
 
 
-def _process_batch(batch, all_ids, all_embeddings, eng):
+def _process_batch(batch, all_ids, all_embeddings, eng, clap_embedder_instance=None):
     """Process a batch of songs - embed and store."""
     texts = [d["mood_text"] for d in batch]
     embeddings = eng.encode(texts, is_query=False)
+
+    # Get CLAP embedder if enabled
+    clap = clap_embedder_instance
+    if clap is None and config.CLAP_ENABLED:
+        try:
+            clap = clap_embedder.get_embedder()
+        except Exception as e:
+            log.warning(f"Failed to load CLAP for batch processing: {e}")
+            clap = None
 
     for i, d in enumerate(batch):
         song_id = database.add_song(
@@ -717,9 +805,222 @@ def _process_batch(batch, all_ids, all_embeddings, eng):
             spectral_bandwidth=d.get("spectral_bandwidth"),
             dynamic_range=d.get("dynamic_range"),
             mfccs=d.get("mfccs"),
+            clap_embedding=None,
+            lyrics_text=d.get("lyrics_text"),
         )
         if song_id:
             all_ids.append(song_id)
             all_embeddings.append(embeddings[i])
-            # Store embedding in database for incremental indexing
+            # Store semantic embedding in database for incremental indexing
             database.update_song_embedding(song_id, embeddings[i])
+
+            # Encode and store CLAP embedding if enabled
+            if clap and config.CLAP_ENABLED:
+                try:
+                    clap_emb = clap.encode_audio(
+                        d["filepath"], max_duration=config.CLAP_MAX_DURATION
+                    )
+                    if clap_emb is not None:
+                        database.update_song_clap_embedding(song_id, clap_emb)
+                        log.debug(f"Stored CLAP embedding for song {song_id}")
+                except Exception as e:
+                    log.warning(f"Failed to encode CLAP for {d['filepath']}: {e}")
+
+
+def fetch_lyrics_background(progress_callback=None):
+    """Fetch online lyrics for all songs that don't have them yet.
+
+    Runs after the main scan completes. Updates songs in the DB as lyrics are found,
+    marking them with lyrics_processed=0 so they can be reprocessed later.
+
+    Returns dict with stats: {found: int, not_found: int, errors: int, total: int}
+    """
+    import sentiment as sentiment_module
+
+    songs_without_lyrics = database.get_songs_without_lyrics()
+    total = len(songs_without_lyrics)
+
+    if total == 0:
+        log.info("No songs without lyrics to fetch.")
+        return {"found": 0, "not_found": 0, "errors": 0, "total": 0}
+
+    log.info(f"Starting background lyrics fetch for {total} songs...")
+
+    stats = {"found": 0, "not_found": 0, "errors": 0, "total": total}
+
+    for i, song in enumerate(songs_without_lyrics):
+        song_id = song["id"]
+        filepath = song["filepath"]
+        title = song["title"] or "Unknown"
+        artist = song["artist"] or "Unknown"
+
+        if progress_callback:
+            progress_callback(
+                {
+                    "current": i + 1,
+                    "total": total,
+                    "current_song": f"{artist} - {title}",
+                    "found": stats["found"],
+                    "not_found": stats["not_found"],
+                }
+            )
+
+        try:
+            lyrics = lyrics_extractor.get_lyrics(
+                filepath,
+                title=title,
+                artist=artist,
+                allow_online=True,
+            )
+
+            if lyrics:
+                cleaned_lyrics = clean_lyrics_text(lyrics)
+                lyrics_snippet = extract_lyrics_snippet(lyrics, max_length=600)
+                lyrics_emotion_result = sentiment_module.analyze_lyrics(
+                    cleaned_lyrics or lyrics
+                )
+
+                lyrics_emotion = None
+                lyrics_emotion_score = 0.0
+                emotion_distribution = None
+                new_valence = None
+
+                if lyrics_emotion_result and lyrics_emotion_result.get("emotion"):
+                    lyrics_emotion = lyrics_emotion_result["emotion"]
+                    lyrics_emotion_score = lyrics_emotion_result.get("score", 0.0)
+                    emotion_distribution = (
+                        json.dumps(
+                            lyrics_emotion_result.get("emotion_distribution", {})
+                        )
+                        if lyrics_emotion_result
+                        else None
+                    )
+
+                    emotion_valence = lyrics_emotion_result.get("valence", 0.0)
+                    if emotion_valence != 0:
+                        current_song = database.get_song_by_id(song_id)
+                        if current_song:
+                            audio_valence = current_song["valence"] or 0.0
+                            new_valence = 0.4 * audio_valence + 0.6 * emotion_valence
+
+                database.update_song_lyrics(
+                    song_id=song_id,
+                    lyrics_text=lyrics,
+                    lyrics_emotion=lyrics_emotion,
+                    lyrics_emotion_score=lyrics_emotion_score,
+                    emotion_distribution=emotion_distribution,
+                    valence=new_valence,
+                    has_lyrics=True,
+                )
+
+                stats["found"] += 1
+                log.info(f"Found lyrics for '{title}' by '{artist}' ({i + 1}/{total})")
+            else:
+                stats["not_found"] += 1
+                log.debug(
+                    f"No lyrics found for '{title}' by '{artist}' ({i + 1}/{total})"
+                )
+
+        except Exception as e:
+            stats["errors"] += 1
+            log.error(f"Error fetching lyrics for '{title}' by '{artist}': {e}")
+
+    log.info(
+        f"Background lyrics fetch complete: {stats['found']} found, "
+        f"{stats['not_found']} not found, {stats['errors']} errors out of {total}"
+    )
+
+    return stats
+
+
+def reprocess_pending_lyrics(progress_callback=None):
+    """Reprocess songs where lyrics were updated but mood_text/embeddings weren't regenerated.
+
+    Finds songs with lyrics_processed=0, rebuilds their mood_text, regenerates
+    embeddings, and rebuilds the search index.
+
+    Returns dict with stats: {reprocessed: int, total: int}
+    """
+    pending = database.get_songs_pending_reprocess()
+    total = len(pending)
+
+    if total == 0:
+        log.info("No songs pending lyrics reprocessing.")
+        return {"reprocessed": 0, "total": 0}
+
+    log.info(f"Reprocessing {total} songs with updated lyrics...")
+    eng = engine.get_engine()
+
+    song_ids_to_reprocess = []
+    new_embeddings = []
+
+    for i, song in enumerate(pending):
+        song_dict = dict(song)
+        song_id = song_dict["id"]
+
+        if progress_callback:
+            progress_callback(
+                {
+                    "current": i + 1,
+                    "total": total,
+                    "current_song": f"{song_dict.get('artist', '')} - {song_dict.get('title', '')}",
+                }
+            )
+
+        try:
+            lyrics_text = song_dict.get("lyrics_text", "")
+            lyrics_emotion = song_dict.get("lyrics_emotion")
+            lyrics_emotion_score = song_dict.get("lyrics_emotion_score", 0.0)
+            lyrics_snippet = ""
+            lyrics_emotion_result = None
+
+            if lyrics_text:
+                cleaned = clean_lyrics_text(lyrics_text)
+                lyrics_snippet = extract_lyrics_snippet(lyrics_text, max_length=600)
+                if cleaned:
+                    lyrics_emotion_result = {
+                        "emotion": lyrics_emotion,
+                        "score": lyrics_emotion_score,
+                        "valence": song_dict.get("valence", 0.0),
+                    }
+
+            mood_text = build_mood_text(
+                song_dict.get("title", ""),
+                song_dict.get("artist", ""),
+                song_dict.get("genre", ""),
+                song_dict.get("bpm", 0.0),
+                song_dict.get("energy", 0.0),
+                song_dict.get("brightness", 0.0),
+                song_dict.get("valence", 0.0),
+                song_dict.get("mode", ""),
+                song_dict.get("arousal", 0.0),
+                lyrics_snippet,
+                lyrics_emotion_result,
+                key_confidence=song_dict.get("key_confidence", 0.5),
+                harmonic_ratio=song_dict.get("harmonic_ratio", 0.0),
+                dynamic_range=song_dict.get("dynamic_range", 0.0),
+            )
+
+            database.update_song_rich_description(
+                song_id, mood_text, valence=song_dict.get("valence")
+            )
+
+            embedding = eng.encode([mood_text], is_query=False)[0]
+            database.update_song_embedding(song_id, embedding)
+
+            song_ids_to_reprocess.append(song_id)
+            new_embeddings.append(embedding)
+
+        except Exception as e:
+            log.error(f"Error reprocessing song {song_id}: {e}")
+
+    # Mark all as reprocessed
+    database.mark_songs_reprocessed(song_ids_to_reprocess)
+
+    # Rebuild the full index
+    _rebuild_index_from_db()
+
+    log.info(
+        f"Reprocessed {len(song_ids_to_reprocess)}/{total} songs with updated lyrics."
+    )
+    return {"reprocessed": len(song_ids_to_reprocess), "total": total}

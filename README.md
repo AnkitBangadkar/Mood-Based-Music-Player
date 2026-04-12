@@ -30,8 +30,10 @@ A local-first, privacy-focused music player that generates intelligent playlists
 | **Embeddings** | BAAI/bge-base-en-v1.5 (768-dim) |
 | **Audio Analysis** | Librosa, NumPy, SciPy |
 | **Metadata** | Mutagen (ID3, Vorbis, MP4) |
-| **Frontend** | Vanilla JS, CSS (glassmorphism) |
-| **Icons** | Lucide (offline) |
+| **Frontend** | React + TypeScript + shadcn/ui |
+| **Styling** | Tailwind CSS |
+| **Icons** | Lucide React |
+| **State** | Zustand |
 
 ## Quick Start
 
@@ -120,13 +122,38 @@ Open http://localhost:8000 in your browser.
 ├── constants.py         # Weights, sigma values, thresholds
 ├── lyrics_extractor.py  # Lyrics fetching (optional)
 ├── sentiment.py         # Emotion classification (optional)
-├── static/
-│   ├── index.html       # Main UI
-│   ├── app.js           # Frontend logic
-│   ├── style.css        # Glassmorphism styles
-│   └── lucide.js        # Icons (offline)
+├── frontend/            # React + shadcn/ui frontend
+│   ├── src/            # Source code
+│   ├── dist/           # Production build
+│   └── package.json
+├── static/              # Legacy vanilla JS frontend
+│   ├── index.html
+│   ├── app.js
+│   ├── style.css
+│   └── lucide.js
 └── presentation/        # PBL presentation slides
 ```
+
+### React Frontend
+
+The new React frontend provides a modern, beautiful UI with:
+- **Sidebar Navigation** - Switch between Discover, Library, Scan, and Settings
+- **Playlist Generator** - Natural language mood queries with beautiful cards
+- **Library Browser** - Search, sort, and browse your music collection
+- **Audio Player** - Full-featured player with progress, volume, shuffle, repeat
+- **Real-time Updates** - Monitor library scanning progress
+- **Keyboard Shortcuts** - Space (play/pause), arrows (navigation/volume)
+
+**To use the React frontend:**
+```bash
+cd frontend
+npm install
+npm run build    # Creates production build in dist/
+cd ..
+python main.py   # FastAPI automatically serves from frontend/dist/
+```
+
+The legacy static frontend is still available as a fallback.
 
 ## Mood Profiles
 

@@ -11,12 +11,16 @@ __pycache__/
 
 # Database and embeddings (generated files)
 library.db
+*.db
+*.db-journal
 embeddings.npy
 embeddings_v2.npz
-embeddings_v3.npy
+embeddings_v3*.npy
+embeddings_v3_emb.npy
 ids.json
 ids_v2.json
 ids_v3.json
+ids_v3_ids.npy
 
 # Lyrics cache (can be regenerated)
 lyrics_cache/
@@ -44,3 +48,17 @@ Thumbs.db
 
 # Test music files (large binary files)
 songs_testing/
+songs_testing_long/
+songs_mainstream/
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
+
+# ML models (downloaded)
+models/
+
+# Claude / OpenCode
+.claude/
+.opencode/
+.playwright-cli/

@@ -24,6 +24,7 @@ import database
 # Import from our clean modules
 from constants import (
     W_SEMANTIC,
+    W_CLAP,
     W_FEATURES,
     W_GENRE,
     W_EMOTION,
@@ -40,6 +41,10 @@ from constants import (
     NEGATION_PENALTY_SCALE,
     KEY_CONFIDENCE_THRESHOLD,
     EMBEDDING_MODEL,
+    EMOTION_DOMINANT_QUERIES,
+    ACOUSTIC_DOMINANT_QUERIES,
+    VALENCE_CONTRADICTION_PENALTY,
+    AROUSAL_CONTRADICTION_PENALTY,
 )
 from profiles import (
     QUERY_SYNONYMS,
@@ -48,6 +53,9 @@ from profiles import (
     QUERY_EMOTION_TARGETS,
     NEGATION_WORDS,
 )
+
+# Import CLAP for audio-text alignment
+import clap_embedder
 
 log = get_logger("Engine")
 
@@ -59,6 +67,10 @@ class VectorEngine:
         self.ids = None
         self.embeddings_path = config.EMBEDDINGS_PATH
         self.ids_path = config.IDS_PATH
+        # CLAP embeddings storage
+        self.clap_embeddings = None
+        self.clap_ids = None
+        self.clap_embedder = None
 
     def load_model(self):
         """Load the sentence transformer model with offline support."""
@@ -157,7 +169,54 @@ class VectorEngine:
         self.ids = np.load(ids_path).tolist()
         self.embeddings = np.load(emb_path)
         log.info(f"Index loaded: {len(self.ids)} songs")
+
+        # Load CLAP embeddings if enabled
+        if config.CLAP_ENABLED:
+            self._load_clap_embeddings()
+
         return True
+
+    def _load_clap_embeddings(self):
+        """Load CLAP embeddings from database."""
+        try:
+            clap_data = database.get_songs_with_clap_embeddings()
+            if not clap_data:
+                log.info("No CLAP embeddings found in database")
+                return
+
+            # Build mapping from id to embedding
+            clap_map = {}
+            for row in clap_data:
+                song_id = row["id"]
+                emb_bytes = row["clap_embedding"]
+                if emb_bytes:
+                    try:
+                        emb = np.frombuffer(emb_bytes, dtype=np.float32)
+                        clap_map[song_id] = emb
+                    except Exception as e:
+                        log.warning(
+                            f"Failed to decode CLAP embedding for song {song_id}: {e}"
+                        )
+
+            # Create aligned arrays matching self.ids order
+            clap_list = []
+            clap_ids = []
+            for song_id in self.ids:
+                if song_id in clap_map:
+                    clap_list.append(clap_map[song_id])
+                    clap_ids.append(song_id)
+
+            if clap_list:
+                self.clap_embeddings = np.array(clap_list)
+                self.clap_ids = clap_ids
+                log.info(f"Loaded CLAP embeddings for {len(clap_list)} songs")
+            else:
+                log.info("No CLAP embeddings matched current index")
+
+        except Exception as e:
+            log.warning(f"Failed to load CLAP embeddings: {e}")
+            self.clap_embeddings = None
+            self.clap_ids = None
 
     @classmethod
     def get_engine(cls):
@@ -213,14 +272,31 @@ def expand_query(query):
     """
     Expand query with synonyms.
 
+    Uses word-boundary matching to prevent partial-word matches
+    (e.g., 'work' should not match inside 'workout').
+
     Returns:
         keywords: list - expanded keywords
     """
+    import re
+
     query_lower = query.lower()
     keywords = [query_lower]
 
+    # Tokenize the query into words for boundary matching
+    query_words = re.findall(r"[a-z']+", query_lower)
+
     for term, synonyms in QUERY_SYNONYMS.items():
-        if term in query_lower:
+        # Match term as a complete word, not as a substring
+        # e.g., "work" should not match inside "workout"
+        term_matches = False
+        if term in query_words:
+            term_matches = True
+        # Also check multi-word terms like "road trip"
+        elif " " in term and term in query_lower:
+            term_matches = True
+
+        if term_matches:
             keywords.extend(synonyms)
 
     # Dedupe while preserving order
@@ -235,13 +311,21 @@ def expand_query(query):
 
 
 def detect_genre(query):
-    """Detect genre keywords in query."""
+    """Detect genre keywords in query using word-boundary matching."""
+    import re
+
     query_lower = query.lower()
+    query_words = set(re.findall(r"[a-z']+", query_lower))
     genre_targets = []
 
     for genre, keywords in GENRE_KEYWORDS.items():
         for kw in keywords:
-            if kw in query_lower:
+            # Match genre keyword as complete word(s)
+            if " " in kw:
+                if kw in query_lower:
+                    genre_targets.append(genre)
+                    break
+            elif kw in query_words:
                 genre_targets.append(genre)
                 break
 
@@ -324,11 +408,19 @@ def compute_feature_score(song, profile):
             match = compute_gaussian_match(
                 valence, target, SIGMA_VALENCE, allow_negative=True
             )
+            if target < -0.1 and valence > 0.1:
+                match *= VALENCE_CONTRADICTION_PENALTY
+            elif target > 0.1 and valence < -0.1:
+                match *= VALENCE_CONTRADICTION_PENALTY
 
         elif feat == "arousal":
             match = compute_gaussian_match(
                 arousal, target, SIGMA_AROUSAL, allow_negative=True
             )
+            if target > 0.5 and arousal < 0.3:
+                match *= AROUSAL_CONTRADICTION_PENALTY
+            elif target < 0.3 and arousal > 0.5:
+                match *= AROUSAL_CONTRADICTION_PENALTY
 
         elif feat == "brightness" and brightness > 0:
             match = compute_gaussian_match(brightness, target, SIGMA_BRIGHTNESS)
@@ -382,7 +474,14 @@ def compute_emotion_score(song, emotion_targets):
 
     # Get pre-parsed emotion distribution
     emotion_dist = song.get("emotion_distribution", {}) or {}
-    if not emotion_dist:
+    if isinstance(emotion_dist, str):
+        try:
+            import json
+
+            emotion_dist = json.loads(emotion_dist)
+        except (json.JSONDecodeError, TypeError):
+            return 0.0
+    if not emotion_dist or not isinstance(emotion_dist, dict):
         return 0.0
 
     # Soft matching: how well does song's emotion distribution match targets
@@ -414,13 +513,34 @@ def compute_negation_penalty(song, negated_keywords):
     return penalty / count if count > 0 else 0.0
 
 
+def _detect_query_type(keywords):
+    """
+    Detect if query is emotion-dominant or acoustic-dominant.
+    Returns tuple (emotion_boost, acoustic_boost) as multipliers.
+    """
+    keywords_set = set(kw.lower() for kw in keywords)
+
+    # Check for emotion-dominant keywords
+    emotion_overlap = keywords_set & EMOTION_DOMINANT_QUERIES
+    acoustic_overlap = keywords_set & ACOUSTIC_DOMINANT_QUERIES
+
+    if emotion_overlap and not acoustic_overlap:
+        # Emotion-dominant: boost CLAP and emotion, reduce features
+        return 1.4, 0.7
+    elif acoustic_overlap and not emotion_overlap:
+        # Acoustic-dominant: boost features, reduce emotion
+        return 0.7, 1.4
+    # Mixed or neutral: no adjustment
+    return 1.0, 1.0
+
+
 def search(query, limit=20):
     """
     Main search pipeline.
 
     Steps:
     1. Parse query (handle negations)
-    2. Generate semantic embedding
+    2. Generate semantic + CLAP embeddings
     3. Expand query & detect signals
     4. Compute all scores
     5. Normalize and combine
@@ -441,11 +561,37 @@ def search(query, limit=20):
     clean_query, negated_keywords = parse_query(query)
     log.info(f"Query: '{query}' -> clean: '{clean_query}', negated: {negated_keywords}")
 
-    # ─── STEP 2: Semantic similarity ───
+    # ─── STEP 2: Semantic similarity (BGE) ───
     query_vec = engine.encode(clean_query, is_query=True)
     raw_similarities = util.cos_sim(query_vec, engine.embeddings)[0].numpy()
 
-    log.info(f"Top raw similarity: {np.max(raw_similarities):.4f}")
+    log.info(f"Top BGE similarity: {np.max(raw_similarities):.4f}")
+
+    # ─── STEP 2b: CLAP audio-text alignment ───
+    clap_similarities = None
+    has_clap = False
+    if (
+        config.CLAP_ENABLED
+        and engine.clap_embeddings is not None
+        and len(engine.clap_embeddings) > 0
+    ):
+        try:
+            clap = clap_embedder.get_embedder()
+            query_clap_vec = clap.encode_text(clean_query)
+            if query_clap_vec is not None:
+                # Compute cosine similarity between query and all songs
+                clap_similarities = np.zeros(len(engine.clap_ids))
+                for i, song_id in enumerate(engine.clap_ids):
+                    song_idx = engine.ids.index(song_id)
+                    song_clap_vec = engine.clap_embeddings[i]
+                    sim = np.dot(query_clap_vec, song_clap_vec)
+                    clap_similarities[i] = sim
+                has_clap = True
+                log.info(f"CLAP active: {len(engine.clap_ids)} songs with embeddings")
+                log.info(f"Top CLAP similarity: {np.max(clap_similarities):.4f}")
+        except Exception as e:
+            log.warning(f"CLAP encoding failed: {e}")
+            has_clap = False
 
     # ─── STEP 3: Gather signals ───
     keywords = expand_query(clean_query)
@@ -458,43 +604,33 @@ def search(query, limit=20):
     has_emotion = len(emotion_targets) > 0
     has_negation = len(negated_keywords) > 0
 
-    # ─── STEP 4: Calculate weights ───
+    # ─── STEP 4: Calculate weights with dynamic adjustment ───
     # Base weights from constants
     w_sem = W_SEMANTIC
+    w_clap = W_CLAP if has_clap else 0.0
     w_feat = W_FEATURES if has_feature else 0.0
     w_genre = W_GENRE if has_genre else 0.0
     w_emotion = W_EMOTION if has_emotion else 0.0
 
-    # Boost feature weight for acoustic property queries
-    # These keywords have reliable feature profiles where audio features matter more than semantics
-    ACOUSTIC_KEYWORDS = {
-        "epic",
-        "cinematic",
-        "dramatic",
-        "dark",
-        "bright",
-        "calm",
-        "energetic",
-        "sad",
-        "happy",
-        "chill",
-        "intense",
-        "relaxing",
-        "melancholy",
-    }
-    if any(kw in ACOUSTIC_KEYWORDS for kw in keywords):
-        w_feat *= 1.5  # Boost feature weight by 50% for acoustic queries
+    # Detect query type for dynamic weight adjustment
+    emotion_boost, acoustic_boost = _detect_query_type(keywords)
 
-    # Redistribute unused weight
-    total_active = w_sem + w_feat + w_genre + w_emotion
+    # Apply dynamic adjustments
+    w_clap *= emotion_boost  # CLAP benefits from emotion queries
+    w_emotion *= emotion_boost
+    w_feat *= acoustic_boost
+
+    # Redistribute unused weight among active signals
+    total_active = w_sem + w_clap + w_feat + w_genre + w_emotion
     if total_active > 0:
         w_sem /= total_active
+        w_clap /= total_active
         w_feat /= total_active
         w_genre /= total_active
         w_emotion /= total_active
 
     log.info(
-        f"Weights: Sem={w_sem:.2f}, Feat={w_feat:.2f}, Genre={w_genre:.2f}, Emotion={w_emotion:.2f}"
+        f"Weights: BGE={w_sem:.2f}, CLAP={w_clap:.2f}, Feat={w_feat:.2f}, Genre={w_genre:.2f}, Emotion={w_emotion:.2f}"
     )
 
     # ─── STEP 5: Normalize semantic scores - preserve relative spread ───
@@ -505,6 +641,18 @@ def search(query, limit=20):
 
     # Simple min-max normalization that preserves relative distances
     norm_semantic = (raw_similarities - sim_min) / sim_range
+
+    # Normalize CLAP scores if available
+    norm_clap = np.zeros(len(engine.ids))
+    if has_clap and clap_similarities is not None:
+        clap_min = float(np.min(clap_similarities))
+        clap_max = float(np.max(clap_similarities))
+        clap_range = max(clap_max - clap_min, SCORE_NORMALIZATION_FLOOR)
+
+        # Map CLAP similarities to full index length (fill zeros for songs without CLAP)
+        for i, song_id in enumerate(engine.clap_ids):
+            song_idx = engine.ids.index(song_id)
+            norm_clap[song_idx] = (clap_similarities[i] - clap_min) / clap_range
 
     # ─── STEP 6: Compute per-song scores ───
     feature_scores = np.zeros(len(engine.ids))
@@ -535,6 +683,7 @@ def search(query, limit=20):
     # ─── STEP 7: Combine scores ───
     final_scores = (
         w_sem * norm_semantic
+        + w_clap * norm_clap
         + w_feat * feature_scores
         + w_genre * genre_scores
         + w_emotion * emotion_scores
