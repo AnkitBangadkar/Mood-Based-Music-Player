@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from soulseek.config import Settings
@@ -18,12 +19,23 @@ def main() -> None:
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--size", type=int, default=20)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--scan-first",
+        action="store_true",
+        help="Repair/reindex the corpus before benchmarking, reusing the loaded encoder",
+    )
     args = parser.parse_args()
 
     settings = Settings()
     services = build_services(settings)
     services.store.initialize()
     try:
+        if args.scan_first:
+            def report(phase: str, progress: float, message: str) -> None:
+                print(f"[{progress:6.1%}] {phase}: {message}", file=sys.stderr)
+
+            scan_result = services.scan_service.scan(args.corpus, report)
+            print(f"Scan result: {json.dumps(scan_result)}", file=sys.stderr)
         result = run_benchmark(
             services.recommender,
             services.store,

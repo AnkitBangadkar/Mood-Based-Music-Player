@@ -52,7 +52,7 @@ After indexing the research corpus with the active Qwen encoder, run the frozen 
 benchmark:
 
 ```bash
-uv run python scripts/benchmark_recommender.py songs_for_research \
+uv run python scripts/benchmark_recommender.py songs_for_research --scan-first \
   --output benchmarks/results/qwen-dev-v1.json
 ```
 
