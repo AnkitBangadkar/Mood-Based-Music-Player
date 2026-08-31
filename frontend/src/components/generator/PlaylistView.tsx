@@ -37,7 +37,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({ playlist, generation
   return (
     <div className="space-y-6 animate-fade-in" data-testid="playlist-view">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-brand-900/40 via-background-card to-background-card border border-brand-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+      <div className="glass-panel bg-gradient-to-r from-brand-900/40 via-background-card/90 to-indigo-950/30 border-brand-500/30 rounded-2xl p-6 relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-2">

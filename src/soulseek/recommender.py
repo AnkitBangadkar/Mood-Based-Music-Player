@@ -53,6 +53,26 @@ class RecommendationService:
         self.max_tracks_per_artist = max_tracks_per_artist
 
     def generate(self, prompt: str, size: int) -> tuple[str, QueryIntent, list[PlaylistSelection]]:
+        intent, selections = self.recommend(prompt, size)
+        persisted = [
+            {
+                "track_id": item.candidate.track_id,
+                "position": item.position,
+                "score": item.final_score,
+                "reasons": list(item.reasons),
+            }
+            for item in selections
+        ]
+        run_id = self.store.save_playlist(
+            prompt,
+            {"desired_text": intent.desired_text, "exclusions": list(intent.exclusions)},
+            self.encoder.encoder_id,
+            persisted,
+        )
+        return run_id, intent, selections
+
+    def recommend(self, prompt: str, size: int) -> tuple[QueryIntent, list[PlaylistSelection]]:
+        """Rank a playlist without persisting a user-visible playlist run."""
         intent = self.intent_parser.parse(prompt)
         rows = self.store.retrieval_rows(self.encoder.encoder_id)
         if not rows:
@@ -95,22 +115,7 @@ class RecommendationService:
         candidates.sort(key=lambda candidate: (-candidate.rank_score, candidate.track_id))
         broad = candidates[: max(self.retrieval_candidates, size * 8)]
         selections = self._diversify(broad, size)
-        persisted = [
-            {
-                "track_id": item.candidate.track_id,
-                "position": item.position,
-                "score": item.final_score,
-                "reasons": list(item.reasons),
-            }
-            for item in selections
-        ]
-        run_id = self.store.save_playlist(
-            prompt,
-            {"desired_text": intent.desired_text, "exclusions": list(intent.exclusions)},
-            self.encoder.encoder_id,
-            persisted,
-        )
-        return run_id, intent, selections
+        return intent, selections
 
     def _diversify(self, candidates: Sequence[Candidate], size: int) -> list[PlaylistSelection]:
         remaining = list(candidates)

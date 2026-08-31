@@ -1,0 +1,14 @@
+[
+  {"id":"romantic","prompt":"romantic candlelit evening for two","relevance":{"field":"contrast_role","equals":"Romantic_vs_Happy:Romantic"}},
+  {"id":"happy","prompt":"bright carefree happy morning","relevance":{"field":"contrast_role","equals":"Romantic_vs_Happy:Happy"}},
+  {"id":"angry","prompt":"furious aggressive music for releasing anger","relevance":{"field":"contrast_role","equals":"Angry_vs_Energetic:Angry"}},
+  {"id":"energetic","prompt":"energetic upbeat momentum without sounding angry","relevance":{"field":"contrast_role","equals":"Angry_vs_Energetic:Energetic"}},
+  {"id":"workout","prompt":"intense focused gym workout","relevance":{"field":"contrast_role","equals":"Workout_vs_Party:Workout"}},
+  {"id":"party","prompt":"celebratory dance party with friends","relevance":{"field":"contrast_role","equals":"Workout_vs_Party:Party"}},
+  {"id":"focus","prompt":"deep concentration for studying and focused work","relevance":{"field":"contrast_role","equals":"Focus_vs_Sleepy:Focus"}},
+  {"id":"sleepy","prompt":"quiet sleepy bedtime wind-down","relevance":{"field":"contrast_role","equals":"Focus_vs_Sleepy:Sleepy"}},
+  {"id":"nostalgic","prompt":"warm nostalgic memories from years ago","relevance":{"field":"contrast_role","equals":"Nostalgic_vs_Sad:Nostalgic"}},
+  {"id":"nostalgic_sad","prompt":"heartbroken sadness without comforting nostalgia","relevance":{"field":"contrast_role","equals":"Nostalgic_vs_Sad:Sad"}},
+  {"id":"calm","prompt":"peaceful calm unwinding after a long day","relevance":{"field":"contrast_role","equals":"Sad_vs_Calm:Calm"}},
+  {"id":"sad","prompt":"melancholic rainy evening alone","relevance":{"field":"contrast_role","equals":"Sad_vs_Calm:Sad"}}
+]

@@ -78,10 +78,16 @@ export const PlaylistGenerator: React.FC<PlaylistGeneratorProps> = ({ onNavigate
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6">
       {/* Page Title */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-brand-400" />
-          <span>Natural Language Playlist Generator</span>
+      <div className="relative shrink-0 overflow-hidden rounded-2xl border border-white/5 bg-background-card/30 px-6 py-5 backdrop-blur-sm">
+        <div className="absolute -right-16 -top-20 h-44 w-44 rounded-full bg-brand-500/10 blur-3xl" />
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-brand-300">
+          Semantic discovery engine
+        </p>
+        <h1 className="relative text-2xl font-bold text-gray-100 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-400/20 bg-brand-500/10">
+            <Sparkles className="w-5 h-5 text-brand-300" />
+          </span>
+          <span className="text-gradient">Describe a moment. Find its soundtrack.</span>
         </h1>
         <p className="text-xs text-gray-400 mt-1">
           Describe the mood, vibe, tempo, or negative exclusions (e.g. “without vocals”) to create a cohesive playlist
@@ -115,7 +121,7 @@ export const PlaylistGenerator: React.FC<PlaylistGeneratorProps> = ({ onNavigate
       )}
 
       {/* Prompt Form Card */}
-      <div className="bg-background-card border border-background-border rounded-2xl p-6 shadow-xl space-y-5">
+      <div className="glass-panel shrink-0 rounded-2xl p-6 space-y-5">
         <form onSubmit={handleGenerate} className="space-y-4" aria-label="Playlist generator form">
           <div>
             <label htmlFor="playlist-prompt-input" className="block text-xs font-semibold text-gray-300 mb-1.5">

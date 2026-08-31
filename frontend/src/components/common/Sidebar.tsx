@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-background border-r border-background-border flex flex-col justify-between p-4 transition-transform duration-300 ${
+        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-background/80 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between p-4 transition-transform duration-300 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
         data-testid="app-sidebar"
@@ -86,12 +86,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="space-y-6">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 px-2 py-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-background-darker shadow-lg shadow-brand-500/25">
+            <div className="brand-orb w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-300 flex items-center justify-center text-background-darker shadow-lg shadow-brand-500/25">
               <Radio className="w-6 h-6 stroke-[2.5]" />
             </div>
             <div>
               <h1 className="font-extrabold text-lg text-gray-100 tracking-tight flex items-center gap-1.5">
-                <span>SoulSeek</span>
+                <span className="text-gradient">SoulSeek</span>
               </h1>
               <p className="text-[11px] text-brand-400 font-medium">Local-First AI Discovery</p>
             </div>

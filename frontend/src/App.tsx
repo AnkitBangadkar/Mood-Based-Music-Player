@@ -15,7 +15,7 @@ const AppContent: React.FC = () => {
   const [isOpenMobile, setIsOpenMobile] = useState(false);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-gray-100 font-sans">
+    <div className="ambient-shell flex h-screen w-screen overflow-hidden bg-background text-gray-100 font-sans">
       {/* Sidebar Navigation */}
       <Sidebar
         activeScreen={activeScreen}
@@ -25,7 +25,7 @@ const AppContent: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden pb-24">
+      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden pb-24">
         <Header
           activeScreen={activeScreen}
           onOpenMobileMenu={() => setIsOpenMobile(true)}

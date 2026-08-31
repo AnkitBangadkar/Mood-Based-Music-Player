@@ -24,10 +24,10 @@ export const PlaylistTrackItem: React.FC<PlaylistTrackItemProps> = ({
 
   return (
     <div
-      className={`group p-3.5 rounded-xl border transition-all duration-200 ${
+      className={`content-auto group p-3.5 rounded-xl border transition-all duration-200 ${
         isCurrent
-          ? 'bg-brand-500/10 border-brand-500/40 shadow-md'
-          : 'bg-background-card/80 hover:bg-background-hover/80 border-background-border/50'
+          ? 'bg-brand-500/10 border-brand-500/40 shadow-lg shadow-brand-950/20'
+          : 'bg-background-card/70 hover:bg-background-hover/90 hover:-translate-y-0.5 hover:shadow-lg border-white/5 hover:border-brand-400/20'
       }`}
       data-testid={`playlist-track-${track.id}`}
     >

@@ -48,6 +48,17 @@ uv run ruff check .
 uv run pytest
 ```
 
+After indexing the research corpus with the active Qwen encoder, run the frozen development
+benchmark:
+
+```bash
+uv run python scripts/benchmark_recommender.py songs_for_research \
+  --output benchmarks/results/qwen-dev-v1.json
+```
+
+The development benchmark uses withheld manifest contrast labels as proxy judgments. It is useful
+for iteration, but final quality claims require a separately frozen set of human judgments.
+
 Configuration uses `SOULSEEK_` environment variables. Runtime state defaults to `./data/` and is intentionally excluded from version control.
 
 ## Repository map
