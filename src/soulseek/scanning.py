@@ -5,7 +5,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from soulseek.domain import CatalogProvider, TextEncoder
+from soulseek.domain import CatalogProviderFactory, TextEncoder
 from soulseek.storage import Store
 
 ProgressCallback = Callable[[str, float, str], None]
@@ -16,20 +16,21 @@ class ScanService:
     def __init__(
         self,
         store: Store,
-        provider: CatalogProvider,
+        provider_factory: CatalogProviderFactory,
         encoder: TextEncoder,
         batch_size: int = 16,
     ):
         self.store = store
-        self.provider = provider
+        self.provider_factory = provider_factory
         self.encoder = encoder
         self.batch_size = batch_size
 
     def scan(self, root: Path, progress: ProgressCallback) -> dict:
         resolved = root.expanduser().resolve()
+        provider = self.provider_factory.create(resolved)
         root_id = self.store.ensure_root(resolved)
         progress("discovering", 0.01, f"Discovering audio files in {resolved}")
-        paths = self.provider.discover(resolved)
+        paths = provider.discover(resolved)
         seen_paths = {str(path.resolve()) for path in paths}
         counters = {"discovered": len(paths), "added": 0, "updated": 0, "unchanged": 0, "errors": 0}
         changed: list[tuple[str, str]] = []
@@ -37,7 +38,7 @@ class ScanService:
 
         for index, path in enumerate(paths, 1):
             try:
-                metadata = self.provider.read(path)
+                metadata = provider.read(path)
                 track_id, action = self.store.upsert_track(root_id, metadata)
                 counters[action] += 1
                 if action != "unchanged":

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from soulseek.catalog import FilesystemCatalogProvider
+from soulseek.catalog import CatalogProviderRouter
 from soulseek.config import Settings
 from soulseek.domain import TextEncoder
 from soulseek.encoders import HashingTextEncoder, SentenceTransformerEncoder
@@ -42,7 +42,7 @@ def build_services(settings: Settings, encoder: TextEncoder | None = None) -> Se
     )
     scan_service = ScanService(
         store,
-        FilesystemCatalogProvider(),
+        CatalogProviderRouter(),
         encoder,
         batch_size=settings.encoder_batch_size,
     )

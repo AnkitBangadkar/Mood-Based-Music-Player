@@ -24,6 +24,7 @@ class TrackMetadata:
     duration_seconds: float | None = None
     track_number: int | None = None
     disc_number: int | None = None
+    descriptors: tuple[str, ...] = ()
 
     @property
     def searchable_text(self) -> str:
@@ -33,6 +34,7 @@ class TrackMetadata:
             f"album: {self.album}" if self.album else "",
             f"genre: {self.genre}" if self.genre else "",
             f"year: {self.year}" if self.year else "",
+            f"descriptors: {', '.join(self.descriptors)}" if self.descriptors else "",
         ]
         return ". ".join(part for part in fields if part)
 
@@ -81,3 +83,7 @@ class CatalogProvider(Protocol):
     def discover(self, root: Path) -> list[Path]: ...
 
     def read(self, path: Path) -> TrackMetadata: ...
+
+
+class CatalogProviderFactory(Protocol):
+    def create(self, root: Path) -> CatalogProvider: ...

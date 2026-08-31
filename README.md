@@ -31,6 +31,16 @@ curl -X POST http://127.0.0.1:8000/api/v1/library/scans \
   -d '{"root":"/absolute/path/to/music"}'
 ```
 
+The curated research corpus is detected automatically when the selected root contains
+`data/manifest.json` and `audio/`. Its descriptive catalog metadata is indexed, while its mood
+judgments remain reserved for evaluation.
+
+Audit that corpus without changing it:
+
+```bash
+uv run python scripts/audit_research_corpus.py songs_for_research --hashes
+```
+
 Run verification:
 
 ```bash
@@ -47,4 +57,5 @@ Configuration uses `SOULSEEK_` environment variables. Runtime state defaults to 
 - `src/soulseek/scanning.py` — incremental ingestion and persistent job state
 - `src/soulseek/recommender.py` — intent, retrieval, ranking, diversification
 - `src/soulseek/encoders.py` — replaceable encoder implementations
+- `src/soulseek/research.py` — read-only research corpus auditing
 - `docs/` — archaeology, decisions, architecture, and frontend handoff
