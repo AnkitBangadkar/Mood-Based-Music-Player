@@ -110,7 +110,7 @@ class ResearchCorpusCatalogProvider:
             self.rows[track_id.casefold()] = item
 
     def discover(self, root: Path) -> list[Path]:
-        if root.resolve() != self.root:
+        if root.resolve() not in {self.root, self.audio_root}:
             raise ValueError("Research corpus provider cannot be reused for another root")
         return sorted(
             path
@@ -154,6 +154,11 @@ class CatalogProviderRouter:
         resolved = root.resolve()
         if (resolved / "data" / "manifest.json").is_file() and (resolved / "audio").is_dir():
             return ResearchCorpusCatalogProvider(resolved)
+        if (
+            resolved.name.casefold() == "audio"
+            and (resolved.parent / "data" / "manifest.json").is_file()
+        ):
+            return ResearchCorpusCatalogProvider(resolved.parent)
         return FilesystemCatalogProvider()
 
 

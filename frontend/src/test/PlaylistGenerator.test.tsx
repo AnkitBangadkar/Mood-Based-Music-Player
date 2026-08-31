@@ -90,6 +90,7 @@ describe('PlaylistGenerator', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('playlist-view')).toBeInTheDocument();
+      expect(screen.getByTestId('generation-time')).toBeInTheDocument();
       expect(screen.getByText(/Target Focus:/i)).toBeInTheDocument();
       expect(screen.getByText('-drums')).toBeInTheDocument();
       expect(screen.getByText('Rainy Street')).toBeInTheDocument();

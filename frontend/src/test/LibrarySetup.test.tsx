@@ -91,7 +91,7 @@ describe('LibrarySetup', () => {
     fireEvent.submit(startBtn.closest('form')!);
 
     await waitFor(() => {
-      expect(startScanSpy).toHaveBeenCalledWith('/home/esscrimson/code/SoulSeek/songs_for_research/audio');
+      expect(startScanSpy).toHaveBeenCalledWith('/home/esscrimson/code/SoulSeek/songs_for_research');
       expect(pollJobSpy).toHaveBeenCalledWith('job_scan_1', expect.any(Function), 800, expect.any(AbortSignal));
     });
 
@@ -173,7 +173,7 @@ describe('LibrarySetup', () => {
     fireEvent.submit(startBtn.closest('form')!);
 
     await waitFor(() => {
-      expect(startScanSpy).toHaveBeenCalledWith('/home/esscrimson/code/SoulSeek/songs_for_research/audio');
+      expect(startScanSpy).toHaveBeenCalledWith('/home/esscrimson/code/SoulSeek/songs_for_research');
       expect(pollJobSpy).toHaveBeenCalledWith('job_failed_1', expect.any(Function), 800, expect.any(AbortSignal));
     });
 

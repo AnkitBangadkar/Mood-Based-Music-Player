@@ -32,6 +32,7 @@ export const PlaylistGenerator: React.FC<PlaylistGeneratorProps> = ({ onNavigate
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLibraryNotIndexed, setIsLibraryNotIndexed] = useState(false);
+  const [generationMs, setGenerationMs] = useState<number | null>(null);
 
   const { showError, showSuccess } = useNotification();
 
@@ -46,6 +47,8 @@ export const PlaylistGenerator: React.FC<PlaylistGeneratorProps> = ({ onNavigate
     setIsLoading(true);
     setError(null);
     setIsLibraryNotIndexed(false);
+    setGenerationMs(null);
+    const startedAt = performance.now();
 
     try {
       const response = await api.generatePlaylist({
@@ -53,6 +56,7 @@ export const PlaylistGenerator: React.FC<PlaylistGeneratorProps> = ({ onNavigate
         size,
       });
       setPlaylist(response);
+      setGenerationMs(performance.now() - startedAt);
       showSuccess(
         'Playlist Generated',
         `Retrieved ${response.tracks.length} tracks matching "${cleanPrompt}"`
@@ -228,7 +232,9 @@ export const PlaylistGenerator: React.FC<PlaylistGeneratorProps> = ({ onNavigate
       )}
 
       {/* Generated Playlist Display */}
-      {playlist && !isLoading && <PlaylistView playlist={playlist} />}
+      {playlist && !isLoading && (
+        <PlaylistView playlist={playlist} generationMs={generationMs} />
+      )}
 
       {/* Empty Initial State */}
       {!playlist && !isLoading && !isLibraryNotIndexed && (

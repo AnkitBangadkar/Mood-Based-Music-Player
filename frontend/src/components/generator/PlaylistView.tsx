@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Sparkles, Ban, CheckCircle, Clock, Music2, Share2, HelpCircle } from 'lucide-react';
+import { Play, Sparkles, Ban, CheckCircle, Clock, Music2, Share2, HelpCircle, Timer } from 'lucide-react';
 import { PlaylistResponse } from '../../api';
 import { PlaylistTrackItem } from './PlaylistTrackItem';
 import { FeedbackButtons } from './FeedbackButtons';
@@ -9,9 +9,10 @@ import { useNotification } from '../../context/NotificationContext';
 
 interface PlaylistViewProps {
   playlist: PlaylistResponse;
+  generationMs?: number | null;
 }
 
-export const PlaylistView: React.FC<PlaylistViewProps> = ({ playlist }) => {
+export const PlaylistView: React.FC<PlaylistViewProps> = ({ playlist, generationMs }) => {
   const { playPlaylist } = useAudioPlayer();
   const { showSuccess } = useNotification();
 
@@ -124,6 +125,20 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({ playlist }) => {
             <span>Total Duration:</span>
             <span className="font-mono text-gray-200">{formatDuration(totalDuration)}</span>
           </div>
+          {generationMs !== null && generationMs !== undefined && (
+            <>
+              <span>•</span>
+              <div className="flex items-center gap-1.5" data-testid="generation-time">
+                <Timer className="w-4 h-4 text-brand-400" />
+                <span>Generated in:</span>
+                <span className="font-mono text-gray-200">
+                  {generationMs < 1000
+                    ? `${Math.round(generationMs)} ms`
+                    : `${(generationMs / 1000).toFixed(2)} s`}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

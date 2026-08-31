@@ -27,7 +27,7 @@ export const LibrarySetup: React.FC = () => {
     cancelScanning,
   } = useLibraryScan();
 
-  const [folderPath, setFolderPath] = useState('/home/esscrimson/code/SoulSeek/songs_for_research/audio');
+  const [folderPath, setFolderPath] = useState('/home/esscrimson/code/SoulSeek/songs_for_research');
   const [inputError, setInputError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,6 +144,10 @@ export const LibrarySetup: React.FC = () => {
           Provide an absolute filesystem path containing your audio files (e.g. MP3, M4A, FLAC, OGG, WAV).
           The scanner will incrementally read tags, extract metadata, and generate embeddings.
         </p>
+        <p className="text-xs text-amber-300/90 leading-relaxed">
+          For the research corpus, select <span className="font-mono">songs_for_research</span> so its
+          <span className="font-mono"> data/manifest.json</span> metadata is available.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4" aria-label="Library scan form">
           <div>
@@ -177,10 +181,10 @@ export const LibrarySetup: React.FC = () => {
             <span className="text-xs text-gray-500">Quick path:</span>
             <button
               type="button"
-              onClick={() => setFolderPath('/home/esscrimson/code/SoulSeek/songs_for_research/audio')}
+              onClick={() => setFolderPath('/home/esscrimson/code/SoulSeek/songs_for_research')}
               className="text-xs font-mono px-2.5 py-1 rounded-lg bg-background-hover text-brand-300 hover:bg-brand-500/20 border border-background-border transition-colors focus-visible:ring-2 focus-visible:ring-brand-400 focus:outline-hidden"
             >
-              songs_for_research/audio
+              songs_for_research
             </button>
           </div>
 

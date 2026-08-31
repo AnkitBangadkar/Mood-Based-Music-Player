@@ -58,3 +58,20 @@ def test_unlisted_audio_falls_back_to_embedded_metadata(tmp_path: Path):
 
     assert item.title == "UNKNOWN"
     assert item.artist == "Unknown artist"
+
+
+def test_router_recognizes_research_corpus_when_audio_subdirectory_is_scanned(tmp_path: Path):
+    root = tmp_path / "corpus"
+    audio_path = make_wav(root / "audio" / "Q1_001.wav")
+    (root / "data").mkdir()
+    (root / "data" / "manifest.json").write_text(
+        json.dumps([{"track_id": "Q1_001", "title": "Bright Morning", "artist": "Nova"}]),
+        encoding="utf-8",
+    )
+
+    provider = CatalogProviderRouter().create(root / "audio")
+
+    assert isinstance(provider, ResearchCorpusCatalogProvider)
+    assert provider.discover(root / "audio") == [audio_path]
+    assert provider.read(audio_path).title == "Bright Morning"
+    assert provider.read(audio_path).artist == "Nova"
