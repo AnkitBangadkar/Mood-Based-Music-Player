@@ -1,62 +1,66 @@
-import { useState, useEffect } from 'react'
-import { Sidebar } from '@/components/Sidebar'
-import { AudioPlayer } from '@/features/player/AudioPlayer'
-import { PlaylistGenerator } from '@/features/generator/PlaylistGenerator'
-import { LibraryBrowser } from '@/features/library/LibraryBrowser'
-import { ScanView } from '@/features/scan/ScanView'
-import { FlushView } from '@/features/scan/FlushView'
-import { useAudio } from '@/hooks/useAudio'
-import { useLibraryStore } from '@/store/libraryStore'
-import { Toaster } from 'sonner'
+import React, { useState } from 'react';
+import { NotificationProvider } from './context/NotificationContext';
+import { LibraryScanProvider } from './context/LibraryScanContext';
+import { AudioPlayerProvider } from './context/AudioPlayerContext';
+import { Sidebar, ActiveScreen } from './components/common/Sidebar';
+import { Header } from './components/common/Header';
+import { PlaylistGenerator } from './components/generator/PlaylistGenerator';
+import { TrackBrowser } from './components/library/TrackBrowser';
+import { LibrarySetup } from './components/library/LibrarySetup';
+import { PersistentPlayer } from './components/player/PersistentPlayer';
+import { QueueDrawer } from './components/player/QueueDrawer';
 
-type View = 'discover' | 'library' | 'scan' | 'flush'
-
-export default function App() {
-  const [currentView, setCurrentView] = useState<View>('discover')
-  const audioRef = useAudio()
-  const { fetchStats } = useLibraryStore()
-
-  useEffect(() => {
-    fetchStats()
-    const interval = setInterval(fetchStats, 5000)
-    return () => clearInterval(interval)
-  }, [fetchStats])
-
-  const renderView = () => {
-    switch (currentView) {
-      case 'discover':
-        return <PlaylistGenerator />
-      case 'library':
-        return <LibraryBrowser />
-      case 'scan':
-        return <ScanView />
-      case 'flush':
-        return <FlushView />
-      default:
-        return <PlaylistGenerator />
-    }
-  }
+const AppContent: React.FC = () => {
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('generator');
+  const [isOpenMobile, setIsOpenMobile] = useState(false);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-        <main className="flex-1 overflow-hidden pb-28">
-          {renderView()}
+    <div className="flex h-screen w-screen overflow-hidden bg-background text-gray-100 font-sans">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        activeScreen={activeScreen}
+        onSelectScreen={setActiveScreen}
+        isOpenMobile={isOpenMobile}
+        onCloseMobile={() => setIsOpenMobile(false)}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden pb-24">
+        <Header
+          activeScreen={activeScreen}
+          onOpenMobileMenu={() => setIsOpenMobile(true)}
+        />
+
+        <main className="flex-1 overflow-hidden flex flex-col">
+          {activeScreen === 'generator' && (
+            <PlaylistGenerator onNavigateToSetup={() => setActiveScreen('setup')} />
+          )}
+          {activeScreen === 'library' && (
+            <TrackBrowser onNavigateToSetup={() => setActiveScreen('setup')} />
+          )}
+          {activeScreen === 'setup' && <LibrarySetup />}
         </main>
       </div>
-      <AudioPlayer />
-      <audio ref={audioRef} />
-      <Toaster 
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
-            color: 'hsl(var(--foreground))',
-          },
-        }}
-      />
+
+      {/* Queue Side Drawer */}
+      <QueueDrawer />
+
+      {/* Global Persistent HTML5 Audio Player */}
+      <PersistentPlayer />
     </div>
-  )
-}
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <NotificationProvider>
+      <LibraryScanProvider>
+        <AudioPlayerProvider>
+          <AppContent />
+        </AudioPlayerProvider>
+      </LibraryScanProvider>
+    </NotificationProvider>
+  );
+};
+
+export default App;
